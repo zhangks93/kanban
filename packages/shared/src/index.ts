@@ -1,4 +1,5 @@
 import { z } from 'zod';
+export * from './effort';
 export const errorStatus = {
   UNAUTHENTICATED: 401,
   FORBIDDEN: 403,
@@ -17,6 +18,7 @@ export const errorStatus = {
   PLUGIN_HAS_DEPENDENCIES: 409,
   DEPENDENCY_CONFLICT: 409,
   LAST_WORKSPACE_OWNER: 409,
+  WORK_LOG_DAILY_LIMIT: 422,
 } as const;
 export type ErrorCode = keyof typeof errorStatus;
 export const messages: Record<ErrorCode, string> = {
@@ -37,6 +39,7 @@ export const messages: Record<ErrorCode, string> = {
   PLUGIN_HAS_DEPENDENCIES: '请先归档依赖此插件的看板',
   DEPENDENCY_CONFLICT: '此资源仍被使用',
   LAST_WORKSPACE_OWNER: '工作空间必须保留至少一位有效所有者',
+  WORK_LOG_DAILY_LIMIT: '同一天在所有任务上的累计工时不能超过 24 小时',
 };
 export const uuid = z.string().uuid();
 export const versionBody = z.object({ expectedVersion: z.number().int().positive() });
@@ -133,6 +136,8 @@ export interface Task {
   priority: Priority;
   start_date: string | null;
   due_date: string | null;
+  estimate_days: number | null;
+  logged_hours: number;
   milestone_id: string | null;
   parent_id: string | null;
   sort_key: string;

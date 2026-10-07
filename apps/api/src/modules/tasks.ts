@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { uuid, versionBody } from '@work/shared';
+import { uuid, versionBody, estimateDaysSchema } from '@work/shared';
 import { pool, transaction } from '../lib/db';
 import { AppError } from '../lib/errors';
 import { getTask, listTasks } from '../repositories/tasks';
@@ -17,6 +17,7 @@ const properties = z.object({
   parentId: uuid.nullable().optional(),
   startDate: z.string().date().nullable().optional(),
   dueDate: z.string().date().nullable().optional(),
+  estimateDays: estimateDaysSchema.nullable().optional(),
   sortKey: z.string().min(1).max(100).optional(),
 });
 const patch = properties.merge(versionBody);

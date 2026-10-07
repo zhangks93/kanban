@@ -5,6 +5,7 @@ import { AuditPage } from '../features/AuditPage';
 import { installedPlugins } from '../plugins/registry';
 import { PluginSettings } from '../features/PluginSettings';
 import { MyWork } from '../features/MyWork';
+import { WorkReportPage } from '../features/WorkReportPage';
 import { BoardsPage } from '../features/BoardsPage';
 import { BoardScreen } from '../features/BoardScreen';
 
@@ -147,6 +148,10 @@ function Shell() {
               <Inbox size={16} />
               我的工作<span className="nav-count">{me.data.used_wip}</span>
             </a>
+            <a className={location.pathname === '/work-logs' ? 'selected' : ''} href="/work-logs">
+              <Layers size={16} />
+              工时统计
+            </a>
             {workspace && (
               <>
                 <a href={`/workspaces/${workspace.key}/search`}>
@@ -282,6 +287,7 @@ const routes = [
     component: PluginSettings,
   }),
   createRoute({ getParentRoute: () => root, path: '/my', component: MyWork }),
+  createRoute({ getParentRoute: () => root, path: '/work-logs', component: WorkReportPage }),
   createRoute({
     getParentRoute: () => root,
     path: '/workspaces/$workspaceKey/boards',

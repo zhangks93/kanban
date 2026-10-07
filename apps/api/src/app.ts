@@ -6,6 +6,7 @@ import { registerPlugins } from './modules/plugins';
 import { registerFocus } from './modules/focus';
 import { registerBoards } from './modules/boards';
 import { registerTasks } from './modules/tasks';
+import { registerWorkLogs } from './modules/work-logs';
 import { registerCollaboration } from './modules/collaboration';
 import { registerAuthMiddleware } from './middleware/auth';
 import { registerAuth } from './modules/auth';
@@ -64,6 +65,7 @@ export async function buildApp(plugins = installedPlugins) {
   await registerBoards(app, registry.templates);
   await registerPlugins(app, registry);
   await registerTasks(app);
+  await registerWorkLogs(app);
   await registerFocus(app);
   await registerInbox(app);
   await registerCollaboration(app);
