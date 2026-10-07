@@ -1,5 +1,20 @@
 # 验证记录
 
+## 2026-10-07：本地启动流程优化
+
+环境：Node.js 24、独立 PostgreSQL 18.4 测试实例、Linux Chromium。该实例仅用于验证，不是项目启动依赖；未使用 Docker。
+
+- lint、TypeScript strict、Web / API 构建与 Web 产物密钥引用扫描通过。
+- Vitest 共 26 个测试通过，覆盖配置初始化、缺失配置提示、密钥持久化、远程 reset / seed 拒绝、API 与数据库行为，以及先登录后配置管理员、引导变量移除后保持管理员身份。
+- pgTAP 共 59 个断言通过；Playwright 共 11 个测试通过，包含 8 张桌面 / 手机截图基线。
+- 实际执行 `pnpm setup` 与 `pnpm dev`：新数据库自动执行 8 个迁移，不导入演示账号；Web 5180 / API 3101 的代理、健康检查、未登录 401 与真实飞书授权重定向均通过。
+- 将 `pgcrypto` / `pg_trgm` 预先安装到 `extensions` schema，确认迁移与查询正常；重复迁移保留已有用户数据。
+- `NODE_ENV=production` 的 API bundle 健康检查与未认证 401 验证通过。
+
+真实飞书授权回调及 Hosted Supabase 网络 / TLS 联调仍需用户提供目标凭据；本次未连接这两项外部服务。修改后的 GitHub Actions 尚未在远端运行。
+
+## 2026-10-06：初始实现
+
 时间：2026-10-06，Asia/Shanghai。环境：Node.js 24、PostgreSQL 15、Chromium/Linux。
 
 | 检查                      | 结果                                                       |

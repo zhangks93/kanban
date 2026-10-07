@@ -1,8 +1,13 @@
 import { spawn } from 'node:child_process';
-import { config } from 'dotenv';
-config({ quiet: true });
+import '../apps/api/src/lib/env';
 const child = spawn(process.execPath, ['apps/api/dist/index.mjs'], {
-  env: { ...process.env, API_PORT: '3002' },
+  env: {
+    ...process.env,
+    NODE_ENV: 'production',
+    APP_BASE_URL: 'https://work.example.test',
+    FEISHU_BASE_URL: '',
+    API_PORT: '3002',
+  },
   stdio: ['ignore', 'pipe', 'pipe'],
 });
 let stderr = '';

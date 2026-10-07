@@ -2,7 +2,9 @@ name: CI
 on: [push, pull_request]
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    env:
+      ENV_FILE: .env.test
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -11,8 +13,15 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: docker compose up -d --build --wait
-      - run: cp .env.example .env
+      - name: Prepare native PostgreSQL test database
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-16 postgresql-16-pgtap
+          sudo systemctl start postgresql
+          sudo -u postgres psql -c "ALTER USER postgres PASSWORD 'localdev'"
+          sudo -u postgres createdb work_platform_test
+          cp tests/.env.example .env.test
+          sed -i 's/localhost:54322/localhost:5432/' .env.test
       - run: pnpm db:reset
       - run: pnpm lint && pnpm typecheck && pnpm test:db && pnpm test
       - run: pnpm build && pnpm check:secrets && pnpm test:production

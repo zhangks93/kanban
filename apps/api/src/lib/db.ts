@@ -1,17 +1,11 @@
-import { existsSync } from 'node:fs';
-import { resolve } from 'node:path';
+import './env';
 import { requestContext } from './request-context';
 import pg from 'pg';
-import { config } from 'dotenv';
-config({
-  quiet: true,
-  path:
-    process.env.ENV_FILE ??
-    [resolve(process.cwd(), '.env'), resolve(process.cwd(), '../../.env')].find(existsSync),
-});
+if (!process.env.SUPABASE_DB_URL)
+  throw Error('请在项目根目录 .env 中配置 SUPABASE_DB_URL（运行 pnpm setup 初始化配置）');
 export const pool = new pg.Pool({
-  connectionString:
-    process.env.SUPABASE_DB_URL ?? 'postgres://postgres:localdev@localhost:54322/work_platform',
+  connectionString: process.env.SUPABASE_DB_URL,
+  options: '-c search_path=public,extensions',
   max: 20,
   connectionTimeoutMillis: 5000,
 });

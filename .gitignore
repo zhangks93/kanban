@@ -8,3 +8,4 @@ test-results/
 .pnpm-store/
 *.log
 work-platform-source.zip
+work/

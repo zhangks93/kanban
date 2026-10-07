@@ -13,6 +13,7 @@ test('relative next rejects open redirects and backslashes', () => {
 test('fake Feishu first login, returning profile, state replay and unauthenticated API', async () => {
   const app = await buildApp();
   const fake = buildFakeFeishu();
+  const previousAdmin = process.env.BOOTSTRAP_PLATFORM_ADMIN_FEISHU_ID;
   await fake.listen({ host: '127.0.0.1', port: 4001 });
   try {
     expect((await app.inject('/api/me')).statusCode).toBe(401);
@@ -49,7 +50,21 @@ test('fake Feishu first login, returning profile, state replay and unauthenticat
       (await pool.query("SELECT display_name FROM app_user WHERE feishu_open_id='new_user'"))
         .rows[0].display_name,
     ).toBe('新用户');
+    process.env.BOOTSTRAP_PLATFORM_ADMIN_FEISHU_ID = 'new_user';
+    expect((await login()).callback.statusCode).toBe(302);
+    expect(
+      (await pool.query("SELECT is_platform_admin FROM app_user WHERE feishu_open_id='new_user'"))
+        .rows[0].is_platform_admin,
+    ).toBe(true);
+    delete process.env.BOOTSTRAP_PLATFORM_ADMIN_FEISHU_ID;
+    expect((await login()).callback.statusCode).toBe(302);
+    expect(
+      (await pool.query("SELECT is_platform_admin FROM app_user WHERE feishu_open_id='new_user'"))
+        .rows[0].is_platform_admin,
+    ).toBe(true);
   } finally {
+    if (previousAdmin === undefined) delete process.env.BOOTSTRAP_PLATFORM_ADMIN_FEISHU_ID;
+    else process.env.BOOTSTRAP_PLATFORM_ADMIN_FEISHU_ID = previousAdmin;
     await fake.close();
     await app.close();
   }

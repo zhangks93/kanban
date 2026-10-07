@@ -1,7 +1,7 @@
 # 实施决策
 
 - pnpm + Node.js 22/24 LTS，所有 TypeScript strict。固定 pg 驱动。
-- 正式部署使用 Supabase Hosted PostgreSQL；本地用 PostgreSQL 15 + pgTAP，不使用 Supabase Auth。
+- 本地联调与正式部署均连接 Supabase Hosted PostgreSQL，不使用 Supabase Auth。默认启动自动迁移，不重置数据或导入演示账号；自动化测试使用独立的本机 PostgreSQL 15+ 与 pgTAP。
 - 前端采用系统中文字体、4px 间距基线、低饱和绿色语义强调色。Radix/shadcn 行为基座统一覆盖产品 token。
 - 不安装附件中建议的外部设计技能；按文档 UI checklist 自检，该技能不影响运行或 CI。
 - 飞书稳定标识采用应用范围 open_id UNIQUE；fake Feishu 为独立本地进程，生产拒绝 override。
@@ -19,4 +19,4 @@
 - sort_key 使用 binary C collation；新建任务使用合法 base-62 integer keys，拖拽使用 fractional-indexing。指针拖拽用 pointerWithin，键盘拖拽回退 closestCorners。
 - Participant 选择即时显示本地 pending 状态，所有 Task version-bearing 请求共用串行队列；失败会清空该 Task 后续请求并 refetch 已确认数据。
 - 通知不持久化 title 等敏感 payload；返回前 JOIN 当前可读 Task。搜索和 My 同样每条校验当前 read permission。
-- 本地数据库、Fake Feishu、测试数据可完整运行；正式外部服务配置留给部署环境，当前没有可用凭据。
+- 本地调试默认使用真实飞书 OAuth，Session 密钥由 setup 自动生成并持久化到 .env。Fake Feishu 与演示数据只服务于隔离测试；真实外部服务需要用户提供相应配置。

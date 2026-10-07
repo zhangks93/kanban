@@ -15,7 +15,7 @@ export function safeNext(value: unknown): string {
 }
 async function feishu(path: string, init?: RequestInit) {
   const response = await fetch(
-    `${process.env.FEISHU_BASE_URL ?? 'https://open.feishu.cn'}${path}`,
+    `${process.env.FEISHU_BASE_URL || 'https://open.feishu.cn'}${path}`,
     { ...init, signal: AbortSignal.timeout(10000) },
   );
   const data = (await response.json()) as { code?: number; data?: any; app_access_token?: string };
@@ -38,8 +38,11 @@ export async function registerAuth(app: FastifyInstance) {
         ? `${process.env.FEISHU_BASE_URL}/authorize`
         : 'https://accounts.feishu.cn/open-apis/authen/v1/authorize',
     );
-    url.searchParams.set('app_id', process.env.FEISHU_APP_ID ?? 'fake');
-    url.searchParams.set('redirect_uri', `${process.env.APP_BASE_URL}/auth/feishu/callback`);
+    url.searchParams.set('app_id', process.env.FEISHU_APP_ID!);
+    url.searchParams.set(
+      'redirect_uri',
+      new URL('/auth/feishu/callback', process.env.APP_BASE_URL).toString(),
+    );
     url.searchParams.set('state', state);
     return reply.redirect(url.toString());
   });
@@ -85,7 +88,7 @@ export async function registerAuth(app: FastifyInstance) {
     if (!profile.open_id || !profile.name) throw new AppError('UNAUTHENTICATED');
     const user = (
       await pool.query(
-        'INSERT INTO app_user(feishu_open_id,feishu_user_id,feishu_union_id,display_name,avatar_url,email,last_login_at,is_platform_admin) VALUES($1,$2,$3,$4,$5,$6,now(),$7) ON CONFLICT(feishu_open_id) DO UPDATE SET display_name=EXCLUDED.display_name,avatar_url=EXCLUDED.avatar_url,email=EXCLUDED.email,last_login_at=now() RETURNING *',
+        'INSERT INTO app_user(feishu_open_id,feishu_user_id,feishu_union_id,display_name,avatar_url,email,last_login_at,is_platform_admin) VALUES($1,$2,$3,$4,$5,$6,now(),$7) ON CONFLICT(feishu_open_id) DO UPDATE SET display_name=EXCLUDED.display_name,avatar_url=EXCLUDED.avatar_url,email=EXCLUDED.email,last_login_at=now(),is_platform_admin=app_user.is_platform_admin OR EXCLUDED.is_platform_admin RETURNING *',
         [
           profile.open_id,
           profile.user_id,

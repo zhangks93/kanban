@@ -7,12 +7,16 @@
     "node": ">=22.13"
   },
   "scripts": {
-    "dev": "concurrently -k \"pnpm --filter @work/api dev\" \"pnpm --filter @work/web dev\"",
+    "setup": "tsx scripts/setup.ts",
+    "dev": "tsx scripts/dev.ts",
+    "dev:api": "pnpm --filter @work/api dev",
+    "dev:web": "pnpm --filter @work/web dev",
     "build": "pnpm --filter @work/web build && pnpm --filter @work/api build",
     "lint": "eslint .",
     "format": "prettier --write .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:unit": "vitest run tests/dev-config.test.ts tests/task-queue.test.ts",
     "test:db": "tsx scripts/db-test.ts",
     "test:e2e": "playwright test",
     "check:secrets": "tsx scripts/check-secrets.ts",
