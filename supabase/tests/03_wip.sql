@@ -1,0 +1,25 @@
+
+BEGIN;CREATE EXTENSION IF NOT EXISTS pgtap;SELECT plan(18);
+SELECT set_config('app.actor_id','10000000-0000-4000-8000-000000000002',true);
+SELECT is(wip_usage('10000000-0000-4000-8000-000000000002'),3,'WIP shared across spaces');
+SELECT is((SELECT count(*) FROM task_focus WHERE task_id='50000000-0000-4000-8000-000000000001'),2::bigint,'multiple workers focus same task');
+SELECT lives_ok($$SELECT focus_task('10000000-0000-4000-8000-000000000002','50000000-0000-4000-8000-000000000001','50000000-0000-4000-8000-000000000003')$$,'idempotent focus');
+SELECT is(wip_usage('10000000-0000-4000-8000-000000000002'),3,'idempotent focus keeps source');
+CREATE TEMP TABLE target AS SELECT * FROM create_task('30000000-0000-4000-8000-000000000002','{"title":"WIP target","responsibleUserId":"10000000-0000-4000-8000-000000000002"}');
+SELECT throws_ok(format('SELECT focus_task(%L,%L)','10000000-0000-4000-8000-000000000002',(SELECT id FROM target)),'P0001','WIP_CAPACITY_EXCEEDED','fourth focus rejected');
+SELECT set_config('app.actor_id','10000000-0000-4000-8000-000000000001',true);SELECT set_wip_limit('10000000-0000-4000-8000-000000000002',1);
+SELECT is(wip_usage('10000000-0000-4000-8000-000000000002'),3,'lower limit does not delete focus');
+SELECT set_config('app.actor_id','10000000-0000-4000-8000-000000000002',true);
+SELECT lives_ok(format('SELECT focus_task(%L,%L,%L)','10000000-0000-4000-8000-000000000002',(SELECT id FROM target),'50000000-0000-4000-8000-000000000003'),'over-limit one-for-one replacement allowed');
+SELECT is(wip_usage('10000000-0000-4000-8000-000000000002'),3,'replacement usage unchanged');
+SELECT throws_ok($$SELECT focus_task('10000000-0000-4000-8000-000000000002','50000000-0000-4000-8000-000000000003','ffffffff-ffff-4fff-8fff-ffffffffffff')$$,'P0001','VALIDATION_FAILED','invalid source rejected');
+SELECT is(wip_usage('10000000-0000-4000-8000-000000000002'),3,'failed replace keeps originals');
+SELECT lives_ok($$SELECT set_task_responsible('50000000-0000-4000-8000-000000000001','10000000-0000-4000-8000-000000000003',1)$$,'participant promoted');
+SELECT ok(EXISTS(SELECT 1 FROM task_focus WHERE task_id='50000000-0000-4000-8000-000000000001' AND user_id='10000000-0000-4000-8000-000000000003'),'new responsible legal focus retained');
+SELECT ok(NOT EXISTS(SELECT 1 FROM task_focus WHERE task_id='50000000-0000-4000-8000-000000000001' AND user_id='10000000-0000-4000-8000-000000000002'),'old responsible focus released');
+SELECT lives_ok($$SELECT remove_task_participant('50000000-0000-4000-8000-000000000002','10000000-0000-4000-8000-000000000002',1)$$,'remove participant');
+SELECT is(wip_usage('10000000-0000-4000-8000-000000000002'),1,'participant removal releases only their focus');
+SELECT lives_ok(format('SELECT move_task(%L,1,%L::jsonb)',(SELECT id FROM target),jsonb_build_object('stateId',(SELECT id FROM board_state WHERE board_id='30000000-0000-4000-8000-000000000002' AND state_group='completed'))::text),'completed transition');
+SELECT is(wip_usage('10000000-0000-4000-8000-000000000002'),0,'completion releases focus');
+SELECT is(wip_usage('10000000-0000-4000-8000-000000000003'),1,'another worker unaffected');
+SELECT * FROM finish();ROLLBACK;

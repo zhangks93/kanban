@@ -1,0 +1,23 @@
+{
+  "name": "@work/api",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsx ../../scripts/build-api.ts",
+    "start": "node dist/index.mjs"
+  },
+  "dependencies": {
+    "@work/shared": "workspace:*",
+    "@work/plugin-sdk": "workspace:*",
+    "@work/plugin-rnd": "workspace:*",
+    "@work/plugin-ops": "workspace:*",
+    "fastify": "^5.6.0",
+    "@fastify/cookie": "^11.0.0",
+    "@fastify/rate-limit": "^10.3.0",
+    "@sentry/node": "^10.30.0",
+    "dotenv": "^17.2.0",
+    "pg": "^8.16.0",
+    "zod": "^3.25.0"
+  }
+}

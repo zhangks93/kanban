@@ -1,0 +1,20 @@
+
+BEGIN;CREATE EXTENSION IF NOT EXISTS pgtap;SELECT plan(13);
+SELECT set_config('app.actor_id','10000000-0000-4000-8000-000000000002',true);
+SELECT throws_ok($$UPDATE task SET type_id=md5('30000000-0000-4000-8000-000000000003task')::uuid WHERE id='50000000-0000-4000-8000-000000000001'$$,'23503',NULL,'type cannot cross board');
+SELECT throws_ok($$SELECT move_task('50000000-0000-4000-8000-000000000003',1,'{"laneId":"40000000-0000-4000-8000-000000000001"}')$$,'P0001','LANE_NOT_ALLOWED','none mode rejects lane');
+SELECT throws_ok($$UPDATE task SET workspace_id='20000000-0000-4000-8000-000000000002' WHERE id='50000000-0000-4000-8000-000000000001'$$,'P0001','VALIDATION_FAILED','scope cannot cross workspace');
+CREATE TEMP TABLE tree_ids AS SELECT * FROM create_task('30000000-0000-4000-8000-000000000002','{"title":"tree root","responsibleUserId":"10000000-0000-4000-8000-000000000002"}');
+CREATE TEMP TABLE tree_child AS SELECT * FROM create_task('30000000-0000-4000-8000-000000000002',jsonb_build_object('title','child','responsibleUserId','10000000-0000-4000-8000-000000000002','parentId',(SELECT id FROM tree_ids)));
+CREATE TEMP TABLE tree_grandchild AS SELECT * FROM create_task('30000000-0000-4000-8000-000000000002',jsonb_build_object('title','grandchild','responsibleUserId','10000000-0000-4000-8000-000000000002','parentId',(SELECT id FROM tree_child)));
+SELECT throws_ok(format('SELECT set_task_parent(%L,%L,1)',(SELECT id FROM tree_ids),'50000000-0000-4000-8000-000000000001'),'P0001','VALIDATION_FAILED','subtree height considered on move');
+SELECT throws_ok(format('SELECT create_task(%L,%L::jsonb)','30000000-0000-4000-8000-000000000002',jsonb_build_object('title','fourth','responsibleUserId','10000000-0000-4000-8000-000000000002','parentId',(SELECT id FROM tree_grandchild))::text),'P0001','VALIDATION_FAILED','fourth level insert blocked');
+SELECT lives_ok($$SELECT move_task('50000000-0000-4000-8000-000000000003',1,'{"delete":true}')$$,'soft delete succeeds');
+SELECT is((SELECT version FROM task WHERE id='50000000-0000-4000-8000-000000000003'),2,'delete bumps version');
+SELECT ok(NOT EXISTS(SELECT 1 FROM task_focus WHERE task_id='50000000-0000-4000-8000-000000000003'),'delete releases all focus');
+SELECT lives_ok($$UPDATE board SET access_mode='restricted' WHERE id='30000000-0000-4000-8000-000000000002'$$,'access restriction');
+SELECT ok(NOT can_read_task('10000000-0000-4000-8000-000000000003','50000000-0000-4000-8000-000000000001'),'historical participant does not grant read');
+SELECT ok(NOT EXISTS(SELECT 1 FROM task_focus WHERE task_id='50000000-0000-4000-8000-000000000001' AND user_id='10000000-0000-4000-8000-000000000003'),'access restriction synchronously releases worker focus');
+SELECT lives_ok($$UPDATE board SET status='archived' WHERE id='30000000-0000-4000-8000-000000000002'$$,'board archive');
+SELECT is((SELECT count(*) FROM task_focus WHERE board_id='30000000-0000-4000-8000-000000000002'),0::bigint,'board archive clears all focus');
+SELECT * FROM finish();ROLLBACK;

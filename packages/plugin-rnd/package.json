@@ -1,0 +1,17 @@
+{
+  "name": "@work/plugin-rnd",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./manifest": "./src/manifest.ts",
+    "./server": "./src/server.ts",
+    "./web": "./src/web.tsx"
+  },
+  "dependencies": {
+    "@work/shared": "workspace:*",
+    "@work/plugin-sdk": "workspace:*",
+    "react": "^19.2.0"
+  }
+}
