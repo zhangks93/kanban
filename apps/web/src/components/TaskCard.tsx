@@ -80,6 +80,12 @@ export function TaskCard({ task, onOpen }: { task: Task; onOpen: () => void }) {
           负责人无当前工作权限
         </div>
       )}
+      {(task.estimate_days !== null || task.logged_hours > 0) && (
+        <div className="card-effort muted">
+          {task.estimate_days !== null && <span>预估 {task.estimate_days} 天</span>}
+          <span>已投入 {task.logged_hours} 小时</span>
+        </div>
+      )}
     </article>
   );
 }

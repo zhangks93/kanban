@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 async function login(page: import('@playwright/test').Page) {
+  await page.clock.setFixedTime(new Date('2026-10-07T04:00:00Z'));
   await page.goto('/login');
   await page.getByRole('link', { name: '使用飞书登录' }).click();
   await page.locator('select[name=user]').selectOption('user_a');

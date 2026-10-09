@@ -1,0 +1,16 @@
+BEGIN;
+CREATE EXTENSION IF NOT EXISTS pgtap;
+SELECT plan(10);
+SELECT set_config('app.actor_id','10000000-0000-4000-8000-000000000002',true);
+SELECT lives_ok($$UPDATE task SET estimate_days=8 WHERE id='50000000-0000-4000-8000-000000000001'$$,'Fibonacci estimate allowed');
+SELECT is((SELECT version FROM task WHERE id='50000000-0000-4000-8000-000000000001'),2,'direct estimate edit bumps version');
+SELECT throws_ok($$UPDATE task SET estimate_days=4 WHERE id='50000000-0000-4000-8000-000000000001'$$,'23514',NULL,'non-Fibonacci estimate rejected by database');
+SELECT lives_ok($$SELECT create_work_log('50000000-0000-4000-8000-000000000001','{"workDate":"2020-01-01","hours":24,"note":"实现任务接口","clientMutationId":"70000000-0000-4000-8000-000000000001"}')$$,'log can be created');
+SELECT is((SELECT version FROM task WHERE id='50000000-0000-4000-8000-000000000001'),2,'log does not conflict with task properties');
+SELECT throws_ok($$SELECT create_work_log('50000000-0000-4000-8000-000000000003','{"workDate":"2020-01-01","hours":1,"note":"联调","clientMutationId":"70000000-0000-4000-8000-000000000002"}')$$,'P0001','WORK_LOG_DAILY_LIMIT','daily limit applies across workspaces');
+SELECT lives_ok($$SELECT create_work_log('50000000-0000-4000-8000-000000000001','{"workDate":"2020-01-01","hours":24,"note":"实现任务接口","clientMutationId":"70000000-0000-4000-8000-000000000001"}')$$,'retry returns existing entry before daily validation');
+SELECT is((SELECT count(*) FROM task_work_log WHERE client_mutation_id='70000000-0000-4000-8000-000000000001'),1::bigint,'retry is not counted twice');
+SELECT throws_ok($$UPDATE task_work_log SET user_id='10000000-0000-4000-8000-000000000003' WHERE client_mutation_id='70000000-0000-4000-8000-000000000001'$$,'P0001','FORBIDDEN','cannot forge another author');
+SELECT throws_ok($$UPDATE task_work_log SET hours=0 WHERE client_mutation_id='70000000-0000-4000-8000-000000000001'$$,'23514',NULL,'positive hours enforced by database');
+SELECT * FROM finish();
+ROLLBACK;

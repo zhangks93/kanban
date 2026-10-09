@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { BoardData, Task, Worker } from '@work/shared';
+import { estimateDaysOptions, estimateDaysSchema } from '@work/shared';
 import { useApp } from '../lib/context';
 import { Modal } from '../components/ui';
 import { api, post } from '../api/client';
@@ -15,6 +16,7 @@ const schema = z.object({
   laneId: z.string(),
   typeId: z.string(),
   priority: z.enum(['none', 'low', 'medium', 'high', 'urgent']),
+  estimateDays: estimateDaysSchema.nullable(),
 });
 export function TaskCreate({
   data,
@@ -55,6 +57,7 @@ export function TaskCreate({
       laneId: initialLane ?? '',
       typeId: data.types[0]?.id,
       priority: 'none',
+      estimateDays: null,
     },
   });
   useEffect(() => {
@@ -139,6 +142,24 @@ export function TaskCreate({
             </select>
           </label>
         </div>
+        <label>
+          预估工时（天）
+          <select
+            aria-label="预估工时（天）"
+            {...register('estimateDays', {
+              setValueAs: (value) => (value === '' || value == null ? null : Number(value)),
+            })}
+          >
+            <option value="">未估算</option>
+            {estimateDaysOptions.map((days) => (
+              <option key={days} value={days}>
+                {days} 天
+              </option>
+            ))}
+          </select>
+          <small className="muted">按斐波那契档位估算；较大任务建议拆分。1 天按 8 小时对比。</small>
+          {errors.estimateDays && <span className="error">{errors.estimateDays.message}</span>}
+        </label>
         {data.board.lane_mode === 'manual' && (
           <label>
             持久泳道

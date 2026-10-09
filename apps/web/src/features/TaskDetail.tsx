@@ -9,6 +9,8 @@ import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { X, Maximize2, Sun, Link as LinkIcon, Send, Trash2 } from 'lucide-react';
 import type { Task, BoardData, Worker } from '@work/shared';
+import { estimateDaysOptions } from '@work/shared';
+import { TaskWorkLogs } from './TaskWorkLogs';
 import { api, post } from '../api/client';
 import { useApp } from '../lib/context';
 import { useTaskMutations } from '../lib/task-mutations';
@@ -373,6 +375,25 @@ function TaskBody({
               onChange={(e) => void save({ dueDate: e.target.value || null })}
             />
           </label>
+          <label>
+            预估工时（天）
+            <select
+              aria-label="预估工时（天）"
+              value={t.estimate_days ?? ''}
+              disabled={!t.can_edit}
+              onChange={(e) =>
+                void save({ estimateDays: e.target.value ? Number(e.target.value) : null })
+              }
+            >
+              <option value="">未估算</option>
+              {estimateDaysOptions.map((days) => (
+                <option key={days} value={days}>
+                  {days} 天
+                </option>
+              ))}
+            </select>
+            <small className="muted">斐波那契估算 · 1 天按 8 小时对比</small>
+          </label>
         </div>
         {t.participants.some((p) => !p.eligible) && (
           <p className="error">
@@ -478,6 +499,7 @@ function TaskBody({
           </div>
         </details>
         <PluginTaskPanels task={t} data={data} />
+        <TaskWorkLogs key={t.id} task={t} />
         <section className="task-children">
           <h3>子任务</h3>
           {children.data?.map((child) => (
@@ -602,6 +624,9 @@ function TaskBody({
                   'participant.remove': '移除参与人',
                   'comment.add': '发表评论',
                   'resource.add': '添加资源',
+                  'work-log.add': '登记工时',
+                  'work-log.update': '修改工时',
+                  'work-log.delete': '删除工时',
                 }[a.action] ?? a.action}
                 <time className="muted">{format(new Date(a.occurred_at), 'yyyy-MM-dd HH:mm')}</time>
               </p>
