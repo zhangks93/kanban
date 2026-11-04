@@ -139,9 +139,16 @@ function TaskBody({
   const activity = useQuery({
     queryKey: ['activity', task?.id],
     queryFn: () =>
-      api<{ id: string; action: string; actor_name: string; occurred_at: string }[]>(
-        `/api/tasks/${task!.id}/activity`,
-      ),
+      api<
+        {
+          id: string;
+          action: string;
+          actor_name: string;
+          agent_client_name: string | null;
+          request_id: string | null;
+          occurred_at: string;
+        }[]
+      >(`/api/tasks/${task!.id}/activity`),
     enabled: !!task,
   });
   const [resource, setResource] = useState({ title: '', url: '' });
@@ -616,7 +623,13 @@ function TaskBody({
           <div className="activity">
             {activity.data?.map((a) => (
               <p key={a.id}>
-                <span>{a.actor_name ?? '系统'}</span> ·{' '}
+                <span title={a.request_id ? `请求 ID：${a.request_id}` : undefined}>
+                  {a.actor_name ?? '系统'}
+                  {a.agent_client_name && (
+                    <small className="muted"> · Agent：{a.agent_client_name}</small>
+                  )}
+                </span>{' '}
+                ·{' '}
                 {{
                   created: '创建任务',
                   updated: '更新任务',

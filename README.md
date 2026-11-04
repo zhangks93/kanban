@@ -4,7 +4,7 @@
 
 **本地开发只需 Node.js、pnpm，以及少量飞书 / Supabase 配置。** `pnpm dev` 会检查配置、应用数据库迁移，并同时启动前后端。
 
-[快速开始](#快速开始) · [环境变量](#环境变量) · [开发与测试](#开发与测试) · [项目结构](#项目结构) · [部署说明](docs/deployment.md)
+[快速开始](#快速开始) · [Agent 接入](docs/agent-access.md) · [环境变量](#环境变量) · [开发与测试](#开发与测试) · [项目结构](#项目结构) · [部署说明](docs/deployment.md)
 
 ![Work 看板界面](tests/e2e/00-visual.spec.ts-snapshots/board-desktop-linux.png)
 
@@ -15,11 +15,28 @@
 - **工时管理**：按斐波那契档位估算天数，按日期登记实际投入与工作说明，跨任务按人员、日期和任务统计，并对比预估与累计工时。
 - **个人工作管理**：跨工作空间的 My Work、全局 WIP 上限、Focus / Unfocus，以及达到上限后的任务替换。
 - **访问控制**：工作空间与看板角色、受限看板、账号停用、成员撤权、审计与最后一位有效 Owner 保护。
+- **Agent 协作**：CLI、能力清单与配套 skill；人通过飞书登录后明确授权单个工作空间、读写范围和有效期，随时撤销。Agent 的查询和修改持续受该用户当前权限约束，并关联审计记录。
 - **基础数据**：工作空间统一维护系统和项目，研发任务关联系统与项目，运维任务复用系统并记录严重程度与事件属性。
 - **公开分享**：看板管理员可开启、关闭或重置只读分享链接。研发与运维公开页分别提供需求、工单提报入口，访客提报由内部受理后转为任务。
 - **交互体验**：任务快捷预览与完整详情、搜索、通知、Intake、移动端布局与长列表虚拟化。
 
 技术栈：TypeScript、React 19、Vite、TanStack Router / Query、Fastify、PostgreSQL、pnpm workspace。认证由服务端飞书 OAuth 与 HttpOnly Session Cookie 提供；浏览器仅访问同源 API。
+
+### Agent 与 CLI
+
+启动应用并应用迁移后，在仓库根目录运行：
+
+```bash
+pnpm work auth login --server http://localhost:5173 --name "任务助手"
+# 人在 CLI 给出的链接中使用飞书登录，确认工作空间与授权范围
+pnpm work schema
+pnpm work boards list
+pnpm work tasks list --limit 50
+```
+
+默认只读；需要维护任务时，登录命令增加 `--write`，并由人在浏览器明确允许。授权默认 1 小时、最长 12 小时，不自动续期。Web 的“Agent 访问”页面提供授权管理。更新和删除要求任务版本，创建要求稳定的 `clientMutationId`，列表提供有界分页。
+
+使用 `pnpm build:cli` 生成独立 CLI，并将 [work-platform skill](skills/work-platform/SKILL.md) 安装到 Agent 的技能目录。完整命令、授权流程和权限边界见 [Agent 接入文档](docs/agent-access.md)。
 
 ### Task 预估与工时
 
@@ -99,7 +116,7 @@ pnpm dev
 | `APP_SESSION_SECRET`                 | 自动生成     | `pnpm setup` / `pnpm dev` 生成并保存；生产须显式提供至少 32 字符的独立随机密钥 |
 | `APP_BASE_URL`                       | 否           | 默认 `http://localhost:5173`，OAuth 回调与请求 Origin 的基准                   |
 | `API_PORT`                           | 否           | 默认 `3001`，Web 开发代理自动跟随                                              |
-| `TRUSTED_PROXY_CIDRS`                | 否           | 逗号分隔的受信任代理 IP/CIDR，用于解析访客 IP；默认不信任代理头                   |
+| `TRUSTED_PROXY_CIDRS`                | 否           | 逗号分隔的受信任代理 IP/CIDR，用于解析访客 IP；默认不信任代理头                |
 | `NODE_ENV`                           | 否           | 默认 `development`，生产设为 `production`                                      |
 | `SENTRY_DSN`                         | 否           | API 错误监控                                                                   |
 | `VITE_SENTRY_DSN`                    | 否           | Web 错误监控                                                                   |
@@ -118,10 +135,11 @@ pnpm dev
 | `pnpm dev:api` / `pnpm dev:web` | 单独启动 API / Web；自行先执行迁移      |
 | `pnpm db:migrate`               | 仅执行待应用的迁移                      |
 | `pnpm lint` / `pnpm typecheck`  | 代码规范与 TypeScript 检查              |
-| `pnpm test:unit`                | 不依赖数据库的配置与任务队列测试        |
+| `pnpm test:unit`                | 不依赖数据库的配置、任务队列与 CLI 测试 |
 | `pnpm test` / `pnpm test:db`    | API 集成测试 / pgTAP 数据库约束测试     |
 | `pnpm test:e2e`                 | Playwright 浏览器测试                   |
-| `pnpm build`                    | 构建 Web 与 API                         |
+| `pnpm build`                    | 构建 Web、API 与 CLI                    |
+| `pnpm work` / `pnpm build:cli`  | 运行 CLI 源码 / 构建独立 CLI            |
 | `pnpm check:secrets`            | 检查 Web 构建产物是否包含服务端密钥引用 |
 
 ### 隔离集成测试
@@ -152,6 +170,7 @@ apps/
   web/                 React 工作台、路由、任务交互与插件界面
 packages/
   shared/              共享类型、校验与错误码
+  cli/                 人授权的 Agent CLI，JSON 输出与版本校验
   plugin-sdk/          插件接口与 Core 模板
   plugin-rnd/          研发插件
   plugin-ops/          运维插件
@@ -162,6 +181,7 @@ supabase/
 scripts/               本地初始化、启动、迁移、构建与校验
 tests/                单元、API 集成与 Playwright 测试
 docs/                 部署、设计决策与验证记录
+skills/work-platform/ Agent 接入 skill 与操作规范
 ```
 
 ## 常见问题

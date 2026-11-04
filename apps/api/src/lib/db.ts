@@ -20,6 +20,9 @@ export async function transaction<T>(
     await db.query("SELECT set_config('app.request_id',$1,true)", [
       requestContext.getStore()?.requestId ?? '',
     ]);
+    await db.query("SELECT set_config('app.agent_authorization_id',$1,true)", [
+      requestContext.getStore()?.agentAuthorizationId ?? '',
+    ]);
     const value = await fn(db);
     await db.query('COMMIT');
     return value;

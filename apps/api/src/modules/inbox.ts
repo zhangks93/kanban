@@ -92,7 +92,7 @@ export async function registerInbox(app: FastifyInstance) {
       throw new AppError('FORBIDDEN');
     return (
       await pool.query(
-        'SELECT a.*,u.display_name AS actor_name FROM audit_log a LEFT JOIN app_user u ON u.id=a.actor_id WHERE workspace_id=$1 ORDER BY id DESC LIMIT 200',
+        'SELECT a.*,u.display_name AS actor_name,g.client_name AS agent_client_name FROM audit_log a LEFT JOIN app_user u ON u.id=a.actor_id LEFT JOIN agent_authorization g ON g.id=a.agent_authorization_id WHERE a.workspace_id=$1 ORDER BY a.id DESC LIMIT 200',
         [wid],
       )
     ).rows;

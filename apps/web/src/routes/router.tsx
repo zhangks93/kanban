@@ -3,6 +3,7 @@ import { NotificationInbox } from '../features/NotificationInbox';
 import { FoundationDataPage } from '../features/PluginDomainPage';
 import { PublicBoard } from '../features/PublicBoard';
 import { AuditPage } from '../features/AuditPage';
+import { AgentAccess } from '../features/AgentAccess';
 import { installedPlugins } from '../plugins/registry';
 import { PluginSettings } from '../features/PluginSettings';
 import { MyWork } from '../features/MyWork';
@@ -29,6 +30,7 @@ import {
   Users,
   Menu,
   Database,
+  Bot,
 } from 'lucide-react';
 import type { Board, User, Workspace } from '@work/shared';
 import { api, post, ApiError } from '../api/client';
@@ -89,9 +91,14 @@ function Shell() {
     }
   }, [toast]);
   useEffect(() => {
-    if (!isPublic && me.error instanceof ApiError && me.error.code === 'UNAUTHENTICATED')
-      window.location.replace('/login');
-  }, [me.isError, isPublic]);
+    if (!isPublic && me.error instanceof ApiError && me.error.code === 'UNAUTHENTICATED') {
+      const next =
+        location.pathname === '/agent-access'
+          ? `/auth/feishu/start?next=${encodeURIComponent(`/agent-access${window.location.search}`)}`
+          : '/login';
+      window.location.replace(next);
+    }
+  }, [me.error, isPublic, location.pathname]);
   if (isPublic) return <Outlet />;
   if (isLogin) return <Login />;
   if (!me.data)
@@ -156,6 +163,13 @@ function Shell() {
             <a className={location.pathname === '/work-logs' ? 'selected' : ''} href="/work-logs">
               <Layers size={16} />
               工时统计
+            </a>
+            <a
+              className={location.pathname === '/agent-access' ? 'selected' : ''}
+              href="/agent-access"
+            >
+              <Bot size={16} />
+              Agent 访问
             </a>
             {workspace && (
               <>
@@ -229,7 +243,11 @@ function Shell() {
             <button aria-label="打开导航" onClick={() => setMobileNav(!mobileNav)}>
               <Menu size={18} />
             </button>
-            <span>{workspace?.name ?? '我的工作'}</span>
+            <span>
+              {location.pathname === '/agent-access'
+                ? 'Agent 访问'
+                : (workspace?.name ?? '我的工作')}
+            </span>
           </div>
           <Outlet />
           {!online && (
@@ -298,6 +316,7 @@ const routes = [
   }),
   createRoute({ getParentRoute: () => root, path: '/my', component: MyWork }),
   createRoute({ getParentRoute: () => root, path: '/work-logs', component: WorkReportPage }),
+  createRoute({ getParentRoute: () => root, path: '/agent-access', component: AgentAccess }),
   createRoute({
     getParentRoute: () => root,
     path: '/workspaces/$workspaceKey/boards',

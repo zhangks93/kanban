@@ -1,0 +1,21 @@
+{
+  "name": "@work/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Human-authorized Agent client for Work",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "bin": {
+    "work": "dist/work.mjs"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "node build.mjs",
+    "start": "node dist/work.mjs"
+  }
+}

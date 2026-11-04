@@ -193,7 +193,7 @@ export async function registerTasks(app: FastifyInstance) {
       await db.query('SELECT require_task_read($1)', [tid]);
       return (
         await db.query(
-          'SELECT a.*,u.display_name AS actor_name FROM task_activity a LEFT JOIN app_user u ON u.id=a.actor_id WHERE task_id=$1 ORDER BY a.id DESC LIMIT 100',
+          'SELECT a.*,u.display_name AS actor_name,g.client_name AS agent_client_name FROM task_activity a LEFT JOIN app_user u ON u.id=a.actor_id LEFT JOIN agent_authorization g ON g.id=a.agent_authorization_id WHERE a.task_id=$1 ORDER BY a.id DESC LIMIT 100',
           [tid],
         )
       ).rows;

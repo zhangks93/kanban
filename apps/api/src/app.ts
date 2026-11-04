@@ -12,6 +12,8 @@ import { registerWorkLogs } from './modules/work-logs';
 import { registerCollaboration } from './modules/collaboration';
 import { registerAuthMiddleware } from './middleware/auth';
 import { registerAuth } from './modules/auth';
+import { registerAgentAuth } from './modules/agent-auth';
+import { registerAgentData } from './modules/agent-data';
 import { registerWorkspaces } from './modules/workspaces';
 import Fastify from 'fastify';
 import { pool } from './lib/db';
@@ -67,6 +69,8 @@ export async function buildApp(plugins = installedPlugins) {
   });
   await registerAuthMiddleware(app);
   await registerAuth(app);
+  await registerAgentAuth(app);
+  await registerAgentData(app);
   await registerWorkspaces(app);
   await registerBoards(app, registry.templates);
   await registerBoardSharing(app);
