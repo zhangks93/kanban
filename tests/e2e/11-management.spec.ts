@@ -16,7 +16,7 @@ test('Board settings, Lanes, labels, comments, resources and Intake work through
   await page.getByRole('button', { name: '创建看板', exact: true }).click();
   await page.waitForURL('**/boards/MGMT');
   await page.getByRole('button', { name: '管理看板', exact: true }).click();
-  await page.getByRole('checkbox', { name: '启用需求入口' }).check();
+  await page.getByRole('checkbox', { name: '启用需求提报' }).check();
   await page.getByRole('dialog').getByRole('button', { name: '保存', exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await page.getByRole('button', { name: '泳道', exact: true }).click();

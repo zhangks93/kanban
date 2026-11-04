@@ -25,6 +25,6 @@ export const manifest: WorkPluginManifest = {
   laneExtensions: [{ key: 'service-lane', name: '运维泳道' }],
   groupProviders: [
     { key: 'severity', name: '严重程度', field: 'severity' },
-    { key: 'service', name: '服务', field: 'service_id' },
+    { key: 'system', name: '系统', field: 'system_id' },
   ],
 };

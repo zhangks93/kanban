@@ -14,6 +14,7 @@ export function IntakePanel({
   onClose: () => void;
 }) {
   const { me, notify } = useApp();
+  const noun = data.board.plugin_key === 'ops' ? '工单' : '需求';
   const qc = useQueryClient();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -22,9 +23,17 @@ export function IntakePanel({
   const rows = useQuery({
     queryKey: ['intake', data.board.id],
     queryFn: () =>
-      api<{ id: string; title: string; status: string; requester_name: string }[]>(
-        `/api/boards/${data.board.id}/intake`,
-      ),
+      api<
+        {
+          id: string;
+          title: string;
+          status: string;
+          requester_name: string;
+          description: string | null;
+          guest_contact: string | null;
+          source: string;
+        }[]
+      >(`/api/boards/${data.board.id}/intake`),
     enabled: open,
   });
   const workers = useQuery({
@@ -44,34 +53,36 @@ export function IntakePanel({
     }
   }
   return (
-    <Modal title="需求入口" open={open} onOpenChange={(v) => !v && onClose()}>
-      <form
-        onSubmit={async (e) => {
-          e.preventDefault();
-          try {
-            await post(`/api/boards/${data.board.id}/intake`, {
-              title,
-              description,
-              clientMutationId: crypto.randomUUID(),
-            });
-            setTitle('');
-            setDescription('');
-            await rows.refetch();
-          } catch (err) {
-            notify((err as Error).message);
-          }
-        }}
-      >
-        <label>
-          需求标题
-          <input value={title} onChange={(e) => setTitle(e.target.value)} required />
-        </label>
-        <label>
-          需求说明
-          <textarea value={description} onChange={(e) => setDescription(e.target.value)} />
-        </label>
-        <button>提交需求</button>
-      </form>
+    <Modal title={`${noun}提报`} open={open} onOpenChange={(v) => !v && onClose()}>
+      {data.board.intake_enabled && (
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault();
+            try {
+              await post(`/api/boards/${data.board.id}/intake`, {
+                title,
+                description,
+                clientMutationId: crypto.randomUUID(),
+              });
+              setTitle('');
+              setDescription('');
+              await rows.refetch();
+            } catch (err) {
+              notify((err as Error).message);
+            }
+          }}
+        >
+          <label>
+            {noun}标题
+            <input value={title} onChange={(e) => setTitle(e.target.value)} required />
+          </label>
+          <label>
+            {noun}说明
+            <textarea value={description} onChange={(e) => setDescription(e.target.value)} />
+          </label>
+          <button>提交{noun}</button>
+        </form>
+      )}
       {data.board.can_manage && (
         <div className="intake-assignee">
           <label>
@@ -96,10 +107,15 @@ export function IntakePanel({
         {rows.data?.map((r) => (
           <div key={r.id}>
             <strong>{r.title}</strong>
+            {r.description && (
+              <p style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{r.description}</p>
+            )}
             <p className="muted">
               {r.requester_name} ·{' '}
               {{ pending: '待处理', accepted: '已接受', declined: '已拒绝' }[r.status]}
+              {r.source === 'public' && ' · 访客提报'}
             </p>
+            {data.board.can_manage && r.guest_contact && <p>联系方式：{r.guest_contact}</p>}
             {data.board.can_manage && r.status === 'pending' && (
               <div>
                 <button onClick={() => void decide(r.id, true)}>接受并创建任务</button>
@@ -110,6 +126,17 @@ export function IntakePanel({
             )}
           </div>
         ))}
+        {rows.isPending && (
+          <p className="muted" role="status">
+            正在加载…
+          </p>
+        )}
+        {rows.isError && (
+          <p className="error" role="alert">
+            提报加载失败。<button onClick={() => void rows.refetch()}>重试</button>
+          </p>
+        )}
+        {rows.data?.length === 0 && <p className="empty">暂无{noun}提报</p>}
       </div>
     </Modal>
   );

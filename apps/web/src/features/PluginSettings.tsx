@@ -1,10 +1,11 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useApp } from '../lib/context';
 import { api, post } from '../api/client';
-import { installedPlugins } from '../plugins/registry';
+import { useState } from 'react';
 export function PluginSettings() {
   const { workspace, me, notify } = useApp();
   const qc = useQueryClient();
+  const [saving, setSaving] = useState('');
   const plugins = useQuery({
     queryKey: ['plugins', workspace?.id],
     queryFn: () =>
@@ -18,8 +19,7 @@ export function PluginSettings() {
     <>
       <header className="page-heading">
         <div>
-          <h1>插件</h1>
-          <p className="muted">专业领域能力按工作空间独立启用，共用任务、权限与全局 WIP。</p>
+          <h1>插件设置</h1>
         </div>
       </header>
       <div className="workspace-list">
@@ -27,17 +27,12 @@ export function PluginSettings() {
           <div className="workspace-row" key={p.key}>
             <div>
               <strong>{p.name}</strong>
-              <p className="muted">
-                {installedPlugins
-                  .find((i) => i.manifest.key === p.key)
-                  ?.manifest.boardTemplates?.map((t) => t.name)
-                  .join('、')}
-              </p>
+              <p className="muted">{p.key === 'rnd' ? '系统 · 项目' : '系统'}</p>
             </div>
-            <span className="muted">{p.enabled ? '已启用' : '未启用'}</span>
             <button
-              disabled={!can}
+              disabled={!can || !!saving}
               onClick={async () => {
+                setSaving(p.key);
                 try {
                   await post(
                     `/api/workspaces/${workspace!.id}/plugins/${p.key}/${p.enabled ? 'disable' : 'enable'}`,
@@ -46,14 +41,19 @@ export function PluginSettings() {
                   await qc.invalidateQueries();
                 } catch (e) {
                   notify((e as Error).message);
+                } finally {
+                  setSaving('');
                 }
               }}
             >
-              {p.enabled ? '停用' : '启用'}
+              {saving === p.key ? '保存中…' : p.enabled ? '停用' : '启用'}
             </button>
           </div>
         ))}
       </div>
+      <p className="workspace-list">
+        <a href={`/workspaces/${workspace?.key}/data`}>管理基础数据</a>
+      </p>
       {me.is_platform_admin && (
         <div className="workspace-archive">
           <button

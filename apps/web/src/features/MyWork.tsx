@@ -64,7 +64,7 @@ export function MyWork() {
           <h1>我的工作</h1>
         </div>
         <div className="wip-display">
-          <span>全局 WIP</span>
+          <span>当前投入</span>
           <strong className="mono">
             {me.used_wip}
             <span> / {me.wip_limit}</span>
@@ -76,7 +76,6 @@ export function MyWork() {
           </div>
         </div>
       </header>
-      <div className="my-note muted">负责人和参与人关系不占 WIP，点亮才代表当前投入。</div>
       <Tabs.Root value={tab} onValueChange={setTab}>
         <Tabs.List className="tabs my-tabs" aria-label="我的工作分类">
           {Object.entries({

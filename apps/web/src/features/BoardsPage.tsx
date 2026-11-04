@@ -34,7 +34,6 @@ export function BoardsPage() {
       <header className="page-heading">
         <div>
           <h1>{workspace.name}</h1>
-          <p className="muted">看板定义工作流，泳道承载长期业务分组。</p>
         </div>
         {['owner', 'admin'].includes(workspace.role) && (
           <button className="primary" onClick={() => setOpen(true)}>
@@ -54,7 +53,7 @@ export function BoardsPage() {
             <div>
               <strong>{b.name}</strong>
               <p className="muted mono">
-                {b.key} · {b.template_key}
+                {templates.data?.find((template) => template.key === b.template_key)?.name ?? b.key}
               </p>
             </div>
             {b.access_mode === 'restricted' && <Lock size={14} />}

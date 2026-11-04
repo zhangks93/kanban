@@ -16,9 +16,8 @@ export function Modal({
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className="dialog-overlay" />
-        <Dialog.Content className="dialog">
+        <Dialog.Content className="dialog" aria-describedby={undefined}>
           <Dialog.Title>{title}</Dialog.Title>
-          <Dialog.Description className="muted">填写以下信息后保存。</Dialog.Description>
           {children}
           <Dialog.Close aria-label="关闭" className="dialog-close">
             ×

@@ -1,6 +1,7 @@
 import { SearchPage } from '../features/SearchPage';
 import { NotificationInbox } from '../features/NotificationInbox';
-import { PluginDomainPage } from '../features/PluginDomainPage';
+import { FoundationDataPage } from '../features/PluginDomainPage';
+import { PublicBoard } from '../features/PublicBoard';
 import { AuditPage } from '../features/AuditPage';
 import { installedPlugins } from '../plugins/registry';
 import { PluginSettings } from '../features/PluginSettings';
@@ -18,7 +19,17 @@ import {
 } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
-import { Layers, Inbox, Search, Settings, ChevronDown, LogOut, Users, Menu } from 'lucide-react';
+import {
+  Layers,
+  Inbox,
+  Search,
+  Settings,
+  ChevronDown,
+  LogOut,
+  Users,
+  Menu,
+  Database,
+} from 'lucide-react';
 import type { Board, User, Workspace } from '@work/shared';
 import { api, post, ApiError } from '../api/client';
 import { AppContext } from '../lib/context';
@@ -31,39 +42,32 @@ function Login() {
         W<span>WORK</span>
       </div>
       <h1>登录工作平台</h1>
-      <p className="muted">用飞书身份进入你的协作空间。</p>
       <a className="login-button primary" href="/auth/feishu/start?next=/my">
         使用飞书登录
       </a>
-      <p className="login-note muted">任务、协作与投入，在同一处。</p>
     </main>
   );
 }
 function Shell() {
   const location = useLocation();
   const isLogin = location.pathname === '/login';
+  const isPublic = location.pathname.startsWith('/share/');
   const me = useQuery({
     queryKey: ['me'],
     queryFn: () => api<User>('/api/me'),
     retry: false,
-    enabled: !isLogin,
+    enabled: !isLogin && !isPublic,
   });
   const workspaces = useQuery({
     queryKey: ['workspaces'],
     queryFn: () => api<Workspace[]>('/api/workspaces'),
-    enabled: !!me.data,
+    enabled: !!me.data && !isPublic,
   });
   const key = location.pathname.match(/^\/workspaces\/([^/]+)/)?.[1];
   const workspace = workspaces.data?.find((w) => w.key === key);
   const boards = useQuery({
     queryKey: ['boards', workspace?.id],
     queryFn: () => api<Board[]>(`/api/workspaces/${workspace!.id}/boards`),
-    enabled: !!workspace,
-  });
-  const plugins = useQuery({
-    queryKey: ['plugins', workspace?.id],
-    queryFn: () =>
-      api<{ key: string; enabled: boolean }[]>(`/api/workspaces/${workspace!.id}/plugins`),
     enabled: !!workspace,
   });
   const [toast, setToast] = useState('');
@@ -85,9 +89,10 @@ function Shell() {
     }
   }, [toast]);
   useEffect(() => {
-    if (me.error instanceof ApiError && me.error.code === 'UNAUTHENTICATED')
+    if (!isPublic && me.error instanceof ApiError && me.error.code === 'UNAUTHENTICATED')
       window.location.replace('/login');
-  }, [me.isError]);
+  }, [me.isError, isPublic]);
+  if (isPublic) return <Outlet />;
   if (isLogin) return <Login />;
   if (!me.data)
     return (
@@ -174,15 +179,14 @@ function Shell() {
                     {b.name}
                   </a>
                 ))}
-                {installedPlugins
-                  .filter((p) => plugins.data?.some((x) => x.key === p.manifest.key && x.enabled))
-                  .flatMap((p) => p.web.navItems ?? [])
-                  .map((item) => (
-                    <a key={item.path} href={`/workspaces/${workspace.key}/${item.path}`}>
-                      {item.title}
-                    </a>
-                  ))}
                 <div className="nav-section">工作空间</div>
+                <a
+                  className={location.pathname.endsWith('/data') ? 'selected' : ''}
+                  href={`/workspaces/${workspace.key}/data`}
+                >
+                  <Database size={16} />
+                  基础数据
+                </a>
                 <a href={`/workspaces/${workspace.key}/settings/members`}>
                   <Users size={16} />
                   成员
@@ -261,6 +265,7 @@ function AuthComplete() {
 }
 const root = createRootRoute({ component: Shell });
 const routes = [
+  createRoute({ getParentRoute: () => root, path: '/share/$token', component: PublicBoard }),
   createRoute({ getParentRoute: () => root, path: '/auth/complete', component: AuthComplete }),
   createRoute({
     getParentRoute: () => root,
@@ -277,10 +282,15 @@ const routes = [
       createRoute({
         getParentRoute: () => root,
         path: `/workspaces/$workspaceKey/${r.path}`,
-        component: PluginDomainPage,
+        component: FoundationDataPage,
       }),
     ),
   ),
+  createRoute({
+    getParentRoute: () => root,
+    path: '/workspaces/$workspaceKey/data',
+    component: FoundationDataPage,
+  }),
   createRoute({
     getParentRoute: () => root,
     path: '/workspaces/$workspaceKey/settings/plugins',

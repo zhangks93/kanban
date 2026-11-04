@@ -69,6 +69,20 @@ export async function registerPlugins(
         if (!b) throw new AppError('NOT_FOUND');
         await db.query('SELECT require_plugin_enabled($1,$2)', [b.workspace_id, key]);
         const result: Record<string, unknown[]> = {};
+        result.systems = (
+          await db.query('SELECT * FROM workspace_system WHERE workspace_id=$1 ORDER BY name,id', [
+            b.workspace_id,
+          ])
+        ).rows;
+        result.projects =
+          key === 'rnd'
+            ? (
+                await db.query(
+                  'SELECT * FROM workspace_project WHERE workspace_id=$1 ORDER BY name,id',
+                  [b.workspace_id],
+                )
+              ).rows
+            : [];
         for (const table of extension.domainTables)
           result[table] = (
             await db.query(`SELECT * FROM ${table} WHERE board_id=$1 ORDER BY name`, [bid])
@@ -86,6 +100,17 @@ export async function registerPlugins(
         return manageBoard(req.actor.id, bid, async (db) => {
           const board = (await db.query('SELECT * FROM board WHERE id=$1', [bid])).rows[0];
           await db.query('SELECT require_plugin_enabled($1,$2)', [board.workspace_id, key]);
+          // Legacy catalog endpoints now feed workspace-wide data and therefore
+          // use the same management permission as the unified data module.
+          if (
+            !(
+              await db.query('SELECT can_manage_workspace($1,$2) ok', [
+                req.actor.id,
+                board.workspace_id,
+              ])
+            ).rows[0].ok
+          )
+            throw new AppError('FORBIDDEN');
           if (board.plugin_key !== key) throw new AppError('VALIDATION_FAILED');
           if (table === 'rnd_module' && !b.systemId) throw new AppError('VALIDATION_FAILED');
           return (
@@ -124,8 +149,8 @@ export async function registerPlugins(
       const p = z.object({ boardId: uuid, laneId: uuid }).parse(req.params);
       const fields =
         key === 'rnd'
-          ? ['project_code', 'owner_id', 'start_date', 'target_end_date']
-          : ['service_id', 'description'];
+          ? ['project_id', 'project_code', 'owner_id', 'start_date', 'target_end_date']
+          : ['system_id', 'service_id', 'description'];
       const shape = Object.fromEntries(
         fields.map((f) => [
           f,
@@ -140,6 +165,10 @@ export async function registerPlugins(
         ]),
       );
       const b = z.object(shape).strict().parse(req.body);
+      if (key === 'ops') {
+        if ('system_id' in b) b.service_id = null;
+        else if ('service_id' in b) b.system_id = b.service_id;
+      }
       return manageBoard(req.actor.id, p.boardId, async (db) => {
         const board = (await db.query('SELECT * FROM board WHERE id=$1', [p.boardId])).rows[0];
         await db.query('SELECT require_plugin_enabled($1,$2)', [board.workspace_id, key]);

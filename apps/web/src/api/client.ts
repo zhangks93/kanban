@@ -4,7 +4,11 @@ export class ApiError extends Error {
     public code: string,
     public detail?: unknown,
   ) {
-    super(messages[code as ErrorCode] ?? '操作失败，请重试');
+    super(
+      code === 'RATE_LIMITED'
+        ? '提交较频繁，请稍后再试'
+        : (messages[code as ErrorCode] ?? '操作失败，请重试'),
+    );
   }
 }
 export async function api<T>(path: string, options?: RequestInit): Promise<T> {

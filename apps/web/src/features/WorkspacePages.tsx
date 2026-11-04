@@ -20,7 +20,6 @@ export function WorkspaceList() {
       <header className="page-heading">
         <div>
           <h1>工作空间</h1>
-          <p className="muted">选择协作范围，进入你的工作。</p>
         </div>
         {me.is_platform_admin && (
           <button className="primary" onClick={() => setOpen(true)}>
