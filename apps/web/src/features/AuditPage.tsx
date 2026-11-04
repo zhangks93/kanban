@@ -13,6 +13,8 @@ export function AuditPage() {
           action: string;
           entity_type: string;
           actor_name: string;
+          agent_client_name: string | null;
+          request_id: string | null;
           occurred_at: string;
         }[]
       >(`/api/workspaces/${workspace!.id}/audit`),
@@ -29,7 +31,12 @@ export function AuditPage() {
             <span className="mono muted">
               {format(new Date(r.occurred_at), 'yyyy-MM-dd HH:mm')}
             </span>
-            <span>{r.actor_name ?? '系统'}</span>
+            <span title={r.request_id ? `请求 ID：${r.request_id}` : undefined}>
+              {r.actor_name ?? '系统'}
+              {r.agent_client_name && (
+                <small className="muted"> · Agent：{r.agent_client_name}</small>
+              )}
+            </span>
             <span>{r.entity_type}</span>
             <span className="muted">{r.action}</span>
           </div>
