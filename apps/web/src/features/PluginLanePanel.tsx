@@ -34,7 +34,17 @@ export function PluginLanePanel({ data, lane }: { data: BoardData; lane: Lane })
       ),
     enabled: active,
   });
+  const members = useQuery({
+    queryKey: ['members', data.board.workspace_id],
+    queryFn: () =>
+      api<{ id: string; display_name: string; status: string; account_status: string }[]>(
+        `/api/workspaces/${data.board.workspace_id}/members`,
+      ),
+    enabled: active && key === 'rnd',
+  });
+  const disabled = !data.board.can_manage;
   async function save(field: string, value: string) {
+    if (disabled) return;
     try {
       await post(
         `/api/plugins/${key}/boards/${data.board.id}/lanes/${lane.id}`,
@@ -49,23 +59,56 @@ export function PluginLanePanel({ data, lane }: { data: BoardData; lane: Lane })
   if (!active || !ext.data) return null;
   return (
     <details className="lane-extension">
-      <summary>{plugin?.manifest.laneExtensions?.[0].name}属性</summary>
+      <summary>{key === 'rnd' ? '项目设置' : '运维设置'}</summary>
       {key === 'rnd' ? (
         <div className="form-grid">
+          <label>
+            项目
+            <select
+              disabled={disabled}
+              value={ext.data.project_id ?? ''}
+              onChange={(e) => void save('project_id', e.target.value)}
+            >
+              <option value="">未设置</option>
+              {options.data?.projects?.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            负责人
+            <select
+              disabled={disabled}
+              value={ext.data.owner_id ?? ''}
+              onChange={(e) => void save('owner_id', e.target.value)}
+            >
+              <option value="">未设置</option>
+              {members.data
+                ?.filter(
+                  (member) => member.status === 'active' && member.account_status === 'active',
+                )
+                .map((member) => (
+                  <option key={member.id} value={member.id}>
+                    {member.display_name}
+                  </option>
+                ))}
+            </select>
+          </label>
           {[
-            ['project_code', '项目编号'],
-            ['owner_id', '负责人 ID'],
             ['start_date', '开始日期'],
             ['target_end_date', '目标结束'],
-          ].map(([f, label]) => (
-            <label key={f}>
+          ].map(([field, label]) => (
+            <label key={field}>
               {label}
               <input
-                type={f.endsWith('_date') ? 'date' : 'text'}
-                key={ext.data![f]}
-                defaultValue={ext.data![f] ?? ''}
+                type="date"
+                disabled={disabled}
+                key={ext.data![field]}
+                defaultValue={ext.data![field] ?? ''}
                 onBlur={(e) => {
-                  if (e.target.value !== (ext.data![f] ?? '')) void save(f, e.target.value);
+                  if (e.target.value !== (ext.data![field] ?? '')) void save(field, e.target.value);
                 }}
               />
             </label>
@@ -74,15 +117,16 @@ export function PluginLanePanel({ data, lane }: { data: BoardData; lane: Lane })
       ) : (
         <>
           <label>
-            服务
+            系统
             <select
-              value={ext.data.service_id ?? ''}
-              onChange={(e) => void save('service_id', e.target.value)}
+              disabled={disabled}
+              value={ext.data.system_id ?? ''}
+              onChange={(e) => void save('system_id', e.target.value)}
             >
               <option value="">未设置</option>
-              {options.data?.ops_service?.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
+              {options.data?.systems?.map((system) => (
+                <option key={system.id} value={system.id}>
+                  {system.name}
                 </option>
               ))}
             </select>
@@ -90,8 +134,13 @@ export function PluginLanePanel({ data, lane }: { data: BoardData; lane: Lane })
           <label>
             说明
             <input
+              disabled={disabled}
+              key={ext.data.description}
               defaultValue={ext.data.description ?? ''}
-              onBlur={(e) => void save('description', e.target.value)}
+              onBlur={(e) => {
+                if (e.target.value !== (ext.data!.description ?? ''))
+                  void save('description', e.target.value);
+              }}
             />
           </label>
         </>

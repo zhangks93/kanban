@@ -392,7 +392,7 @@ function TaskBody({
                 </option>
               ))}
             </select>
-            <small className="muted">斐波那契估算 · 1 天按 8 小时对比</small>
+            <small className="muted">1 天 = 8 小时</small>
           </label>
         </div>
         {t.participants.some((p) => !p.eligible) && (
@@ -408,7 +408,7 @@ function TaskBody({
           <summary>更多属性</summary>
           <div className="property-grid">
             <label>
-              持久泳道
+              泳道
               <select
                 disabled={!t.can_edit || data.board.lane_mode === 'none'}
                 value={t.lane_id ?? ''}

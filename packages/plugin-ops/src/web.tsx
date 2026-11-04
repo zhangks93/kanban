@@ -19,14 +19,14 @@ function OpsPanel({ task, mutate, options, disabled }: PanelProps) {
           </select>
         </label>
         <label>
-          服务
+          系统
           <select
             disabled={disabled}
-            value={String(task.plugin_fields?.service_id ?? '')}
-            onChange={(e) => void mutate({ service_id: e.target.value || null })}
+            value={String(task.plugin_fields?.system_id ?? '')}
+            onChange={(e) => void mutate({ system_id: e.target.value || null })}
           >
             <option value="">未设置</option>
-            {options.ops_service?.map((s) => (
+            {options.systems?.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}
               </option>
@@ -82,12 +82,11 @@ function OpsPanel({ task, mutate, options, disabled }: PanelProps) {
 }
 export const web: WorkPluginWeb = {
   key: 'ops',
-  routes: [{ path: 'ops/services', title: '运维服务' }],
-  navItems: [{ path: 'ops/services', title: '运维服务' }],
+  routes: [{ path: 'ops/services', title: '基础数据' }],
   taskPanels: [{ key: 'ops', component: OpsPanel }],
   boardPanels: [{ key: 'ops-lanes', title: '运维泳道' }],
   groupProviders: [
     { key: 'severity', label: '严重程度', field: 'severity' },
-    { key: 'service', label: '服务', field: 'service_id' },
+    { key: 'system', label: '系统', field: 'system_id' },
   ],
 };

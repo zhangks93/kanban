@@ -1,5 +1,7 @@
 import type { WorkPluginWeb, PanelProps } from '@work/plugin-sdk';
 function RndPanel({ task, mutate, options, disabled }: PanelProps) {
+  const systemId = String(task.plugin_fields?.system_id ?? '');
+  const projects = (options.projects ?? []) as { id: string; name: string; system_id: string }[];
   return (
     <section className="plugin-panel">
       <h3>研发属性</h3>
@@ -7,12 +9,12 @@ function RndPanel({ task, mutate, options, disabled }: PanelProps) {
         <label>
           系统
           <select
-            value={String(task.plugin_fields?.system_id ?? '')}
+            value={systemId}
             disabled={disabled}
-            onChange={(e) => void mutate({ system_id: e.target.value || null, module_id: null })}
+            onChange={(e) => void mutate({ system_id: e.target.value || null, project_id: null })}
           >
             <option value="">未设置</option>
-            {options.rnd_system?.map((s) => (
+            {options.systems?.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}
               </option>
@@ -20,18 +22,20 @@ function RndPanel({ task, mutate, options, disabled }: PanelProps) {
           </select>
         </label>
         <label>
-          模块
+          项目
           <select
-            value={String(task.plugin_fields?.module_id ?? '')}
-            disabled={disabled}
-            onChange={(e) => void mutate({ module_id: e.target.value || null })}
+            value={String(task.plugin_fields?.project_id ?? '')}
+            disabled={disabled || !systemId}
+            onChange={(e) => void mutate({ project_id: e.target.value || null })}
           >
             <option value="">未设置</option>
-            {options.rnd_module?.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
+            {projects
+              .filter((project) => project.system_id === systemId)
+              .map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
           </select>
         </label>
       </div>
@@ -40,12 +44,11 @@ function RndPanel({ task, mutate, options, disabled }: PanelProps) {
 }
 export const web: WorkPluginWeb = {
   key: 'rnd',
-  routes: [{ path: 'rnd/systems', title: '研发系统与模块' }],
-  navItems: [{ path: 'rnd/systems', title: '研发系统' }],
+  routes: [{ path: 'rnd/systems', title: '基础数据' }],
   taskPanels: [{ key: 'rnd', component: RndPanel }],
   boardPanels: [{ key: 'rnd-projects', title: '项目泳道' }],
   groupProviders: [
     { key: 'system', label: '系统', field: 'system_id' },
-    { key: 'module', label: '模块', field: 'module_id' },
+    { key: 'project', label: '项目', field: 'project_id' },
   ],
 };

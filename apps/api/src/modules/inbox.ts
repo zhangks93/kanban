@@ -61,7 +61,7 @@ export async function registerInbox(app: FastifyInstance) {
       throw new AppError('NOT_FOUND');
     return (
       await pool.query(
-        'SELECT r.*,u.display_name AS requester_name FROM intake_request r JOIN app_user u ON u.id=r.requester_id WHERE board_id=$1 AND (requester_id=$2 OR can_manage_board($2,$1)) ORDER BY created_at DESC LIMIT 100',
+        'SELECT r.*,coalesce(u.display_name,r.guest_name) AS requester_name FROM intake_request r LEFT JOIN app_user u ON u.id=r.requester_id WHERE board_id=$1 AND (requester_id=$2 OR can_manage_board($2,$1)) ORDER BY created_at DESC LIMIT 100',
         [bid, req.actor.id],
       )
     ).rows;

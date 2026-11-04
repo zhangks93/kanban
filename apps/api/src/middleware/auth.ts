@@ -46,6 +46,12 @@ export async function registerAuthMiddleware(app: FastifyInstance) {
         throw new AppError('FORBIDDEN');
     }
     if (req.url.startsWith('/auth/feishu/') || req.url.startsWith('/api/health')) return;
+    const path = req.url.split('?')[0];
+    if (
+      (req.method === 'GET' && /^\/api\/public\/boards\/[^/]+$/.test(path)) ||
+      (req.method === 'POST' && /^\/api\/public\/boards\/[^/]+\/submissions$/.test(path))
+    )
+      return;
     const token = req.cookies.session ? verified(req.cookies.session) : null;
     if (!token) throw new AppError('UNAUTHENTICATED');
     const result = await pool.query(

@@ -83,7 +83,7 @@ export function BoardManage({
           </label>
           <label className="checkbox-label">
             <input type="checkbox" checked={intake} onChange={(e) => setIntake(e.target.checked)} />
-            启用需求入口
+            {data.board.plugin_key === 'ops' ? '启用工单提报' : '启用需求提报'}
           </label>
           <div className="dialog-actions">
             <button className="primary">保存</button>

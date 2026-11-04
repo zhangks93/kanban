@@ -1,4 +1,5 @@
 import { BoardManage } from './BoardManage';
+import { BoardShare } from './BoardShare';
 import { PluginLanePanel } from './PluginLanePanel';
 import { IntakePanel } from './IntakePanel';
 import { installedPlugins } from '../plugins/registry';
@@ -24,7 +25,7 @@ import {
 } from '@dnd-kit/sortable';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { generateKeyBetween } from 'fractional-indexing';
-import { Plus, Filter, Rows3, ChevronDown, Settings2 } from 'lucide-react';
+import { Plus, Filter, Rows3, ChevronDown, Settings2, Share2 } from 'lucide-react';
 import type { Task, Board, BoardData, Worker, State } from '@work/shared';
 import { useApp } from '../lib/context';
 import { api, post } from '../api/client';
@@ -140,6 +141,13 @@ export function BoardScreen() {
       ),
     enabled: !!board?.plugin_key,
   });
+  const requestedGroup = new URLSearchParams(window.location.search).get('group') ?? '';
+  const initialGroup =
+    requestedGroup === 'module'
+      ? 'project'
+      : requestedGroup === 'service'
+        ? 'system'
+        : requestedGroup;
   const [grouping, setGrouping] = useState(
     [
       'lane',
@@ -149,11 +157,10 @@ export function BoardScreen() {
       'milestone',
       'none',
       'system',
-      'module',
+      'project',
       'severity',
-      'service',
-    ].includes(new URLSearchParams(window.location.search).get('group') ?? '')
-      ? new URLSearchParams(window.location.search).get('group')!
+    ].includes(initialGroup)
+      ? initialGroup
       : 'lane',
   );
   const [peek, setPeek] = useState<string | null>(null);
@@ -165,6 +172,7 @@ export function BoardScreen() {
   const [lanesOpen, setLanesOpen] = useState(false);
   const [intakeOpen, setIntakeOpen] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [filter, setFilter] = useState({ q: '', priority: '', participant: '' });
   const mutations = useTaskMutations();
   const qc = useQueryClient();
@@ -403,7 +411,7 @@ export function BoardScreen() {
             }}
           >
             {Object.entries({
-              lane: '持久泳道',
+              lane: '泳道',
               responsible: '负责人',
               priority: '优先级',
               type: '类型',
@@ -424,11 +432,22 @@ export function BoardScreen() {
         </label>
         <div className="toolbar-spacer" />
         {d.board.can_manage && (
+          <button onClick={() => setShareOpen(true)}>
+            <Share2 size={14} />
+            分享
+          </button>
+        )}
+        {d.board.can_manage && (
           <button aria-label="管理看板" onClick={() => setManageOpen(true)}>
             <Settings2 size={14} />
           </button>
         )}
-        {d.board.intake_enabled && <button onClick={() => setIntakeOpen(true)}>需求</button>}
+        {(d.board.intake_enabled ||
+          (d.board.can_manage && ['rnd', 'ops'].includes(d.board.plugin_key ?? ''))) && (
+          <button onClick={() => setIntakeOpen(true)}>
+            {d.board.plugin_key === 'ops' ? '工单' : '需求'}
+          </button>
+        )}
         {d.board.can_manage && d.board.lane_mode === 'manual' && (
           <button onClick={() => setLanesOpen(true)}>
             <Settings2 size={14} />
@@ -509,6 +528,9 @@ export function BoardScreen() {
         />
       )}
       <BoardManage data={d} open={manageOpen} onClose={() => setManageOpen(false)} />
+      {d.board.can_manage && (
+        <BoardShare boardId={d.board.id} open={shareOpen} onClose={() => setShareOpen(false)} />
+      )}
       <IntakePanel data={d} open={intakeOpen} onClose={() => setIntakeOpen(false)} />
       <LaneManager data={d} open={lanesOpen} onClose={() => setLanesOpen(false)} />
       {peek && <TaskDetail taskId={peek} data={d} onClose={() => setPeek(null)} />}
@@ -537,7 +559,7 @@ function LaneManager({
     }
   }
   return (
-    <Modal title="管理持久泳道" open={open} onOpenChange={(v) => !v && onClose()}>
+    <Modal title="管理泳道" open={open} onOpenChange={(v) => !v && onClose()}>
       <div className="lane-manager">
         {data.lanes
           .filter((l) => l.status === 'active')

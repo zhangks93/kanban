@@ -1,128 +1,232 @@
-import { useLocation } from '@tanstack/react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
-import type { Board } from '@work/shared';
+import { useEffect, useState, type FormEvent } from 'react';
+import { Plus } from 'lucide-react';
 import { useApp } from '../lib/context';
 import { api, post } from '../api/client';
-import { installedPlugins } from '../plugins/registry';
-export function PluginDomainPage() {
-  const path = useLocation().pathname;
-  const key = path.includes('/rnd/') ? 'rnd' : 'ops';
+import '../styles/foundation-data.css';
+
+type System = { id: string; name: string };
+type Project = System & { system_id: string };
+type FoundationData = { systems: System[]; projects: Project[] };
+type DataKind = 'systems' | 'projects';
+type Editor = { id?: string; name: string; systemId: string };
+
+export function FoundationDataPage() {
   const { workspace, notify } = useApp();
   const qc = useQueryClient();
-  const [selected, setSelected] = useState('');
-  const [name, setName] = useState('');
-  const [system, setSystem] = useState('');
-  const [kind, setKind] = useState(key === 'rnd' ? 'systems' : 'services');
-  const enabled = useQuery({
-    queryKey: ['plugins', workspace?.id],
-    queryFn: () =>
-      api<{ key: string; enabled: boolean }[]>(`/api/workspaces/${workspace!.id}/plugins`),
+  const [kind, setKind] = useState<DataKind>('systems');
+  const [editor, setEditor] = useState<Editor | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [systemFilter, setSystemFilter] = useState('');
+  const canManage = ['owner', 'admin'].includes(workspace?.role ?? '');
+  const data = useQuery({
+    queryKey: ['foundation-data', workspace?.id],
+    queryFn: () => api<FoundationData>(`/api/workspaces/${workspace!.id}/data`),
     enabled: !!workspace,
   });
-  const boards = useQuery({
-    queryKey: ['boards', workspace?.id],
-    queryFn: () => api<Board[]>(`/api/workspaces/${workspace!.id}/boards`),
-    enabled: !!workspace,
-  });
-  const list = boards.data?.filter((b) => b.plugin_key === key) ?? [];
-  const bid = selected || list[0]?.id;
-  const options = useQuery({
-    queryKey: ['plugin-options', key, bid],
-    queryFn: () =>
-      api<Record<string, { id: string; name: string }[]>>(
-        `/api/plugins/${key}/boards/${bid}/options`,
-      ),
-    enabled: !!bid && !!enabled.data?.some((p) => p.key === key && p.enabled),
-  });
-  const plugin = installedPlugins.find((p) => p.manifest.key === key);
-  if (enabled.isFetched && !enabled.data?.some((p) => p.key === key && p.enabled))
-    return <div className="empty">当前工作空间未启用此插件。</div>;
+  useEffect(() => {
+    setEditor(null);
+    setSystemFilter('');
+  }, [workspace?.id, kind]);
+  const systems = data.data?.systems ?? [];
+  const projects = data.data?.projects ?? [];
+  const rows =
+    kind === 'systems'
+      ? systems
+      : projects.filter((p) => !systemFilter || p.system_id === systemFilter);
+  const label = kind === 'systems' ? '系统' : '项目';
+  const base = `/api/workspaces/${workspace?.id}/data/${kind}`;
+
+  async function refresh() {
+    await Promise.all([
+      qc.invalidateQueries({ queryKey: ['foundation-data', workspace?.id] }),
+      qc.invalidateQueries({ queryKey: ['plugin-options'] }),
+    ]);
+  }
+  async function save(event: FormEvent) {
+    event.preventDefault();
+    if (!editor || busy) return;
+    setBusy(true);
+    try {
+      await post(
+        `${base}${editor.id ? `/${editor.id}` : ''}`,
+        {
+          name: editor.name.trim(),
+          ...(kind === 'projects' ? { systemId: editor.systemId } : {}),
+        },
+        editor.id ? 'PATCH' : 'POST',
+      );
+      setEditor(null);
+      await refresh();
+    } catch (error) {
+      notify((error as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function remove(row: System) {
+    if (busy || !window.confirm(`删除${label}“${row.name}”？`)) return;
+    setBusy(true);
+    try {
+      await post(`${base}/${row.id}`, {}, 'DELETE');
+      await refresh();
+    } catch (error) {
+      notify((error as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  if (!workspace) return <div className="empty">请选择工作空间</div>;
   return (
     <>
       <header className="page-heading">
-        <div>
-          <h1>{plugin?.web.routes?.[0].title}</h1>
-          <p className="muted">领域对象按看板隔离；动态分组不改变持久泳道。</p>
-        </div>
-        <select
-          aria-label="选择领域看板"
-          value={bid ?? ''}
-          onChange={(e) => setSelected(e.target.value)}
-        >
-          {list.map((b) => (
-            <option key={b.id} value={b.id}>
-              {b.name}
-            </option>
-          ))}
-        </select>
+        <h1>基础数据</h1>
+        {canManage && (
+          <button
+            className="primary"
+            disabled={busy || (kind === 'projects' && systems.length === 0)}
+            onClick={() => setEditor({ name: '', systemId: systemFilter || systems[0]?.id || '' })}
+          >
+            <Plus size={16} />
+            添加{label}
+          </button>
+        )}
       </header>
-      {!bid ? (
-        <div className="empty">先创建此插件的看板。</div>
-      ) : (
-        <div className="domain-content">
-          {Object.entries(options.data ?? {}).map(([table, rows]) => (
-            <section key={table}>
-              <h2>{table === 'rnd_system' ? '系统' : table === 'rnd_module' ? '模块' : '服务'}</h2>
-              {rows.map((r) => (
-                <div className="domain-row" key={r.id}>
-                  {r.name}
-                  <span className="mono muted">{r.id.slice(0, 8)}</span>
-                </div>
-              ))}
-              {rows.length === 0 && <p className="muted">暂无记录</p>}
-            </section>
-          ))}
-          {list.find((b) => b.id === bid)?.can_manage && (
-            <form
-              className="domain-form"
-              onSubmit={async (e) => {
-                e.preventDefault();
-                try {
-                  await post(`/api/plugins/${key}/boards/${bid}/${kind}`, {
-                    name,
-                    systemId: kind === 'modules' ? system : undefined,
-                  });
-                  setName('');
-                  await qc.invalidateQueries({ queryKey: ['plugin-options'] });
-                } catch (err) {
-                  notify((err as Error).message);
-                }
-              }}
+      <div className="foundation-data">
+        <div className="foundation-toolbar">
+          <nav className="foundation-tabs" aria-label="基础数据分类">
+            <button
+              aria-current={kind === 'systems' ? 'page' : undefined}
+              onClick={() => setKind('systems')}
             >
-              {key === 'rnd' && (
-                <select value={kind} onChange={(e) => setKind(e.target.value)}>
-                  <option value="systems">系统</option>
-                  <option value="modules">模块</option>
-                </select>
-              )}
-              {kind === 'modules' && (
+              系统 <span>{systems.length}</span>
+            </button>
+            <button
+              aria-current={kind === 'projects' ? 'page' : undefined}
+              onClick={() => setKind('projects')}
+            >
+              项目 <span>{projects.length}</span>
+            </button>
+          </nav>
+          {kind === 'projects' && projects.length > 0 && (
+            <select
+              aria-label="按系统筛选项目"
+              value={systemFilter}
+              onChange={(event) => setSystemFilter(event.target.value)}
+            >
+              <option value="">全部系统</option>
+              {systems.map((system) => (
+                <option key={system.id} value={system.id}>
+                  {system.name}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+        {editor && canManage && (
+          <form className="foundation-editor" onSubmit={(event) => void save(event)}>
+            <label>
+              {label}名称
+              <input
+                autoFocus
+                required
+                maxLength={100}
+                value={editor.name}
+                onChange={(event) => setEditor({ ...editor, name: event.target.value })}
+              />
+            </label>
+            {kind === 'projects' && (
+              <label>
+                所属系统
                 <select
-                  aria-label="所属系统"
-                  value={system}
-                  onChange={(e) => setSystem(e.target.value)}
                   required
+                  value={editor.systemId}
+                  onChange={(event) => setEditor({ ...editor, systemId: event.target.value })}
                 >
                   <option value="">选择系统</option>
-                  {options.data?.rnd_system?.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
+                  {systems.map((system) => (
+                    <option key={system.id} value={system.id}>
+                      {system.name}
                     </option>
                   ))}
                 </select>
-              )}
-              <input
-                aria-label="领域对象名称"
-                placeholder="名称"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-              />
-              <button>添加</button>
-            </form>
-          )}
-        </div>
-      )}
+              </label>
+            )}
+            <div className="foundation-actions">
+              <button
+                type="submit"
+                className="primary"
+                disabled={busy || !editor.name.trim() || (kind === 'projects' && !editor.systemId)}
+              >
+                {busy ? '保存中…' : '保存'}
+              </button>
+              <button type="button" disabled={busy} onClick={() => setEditor(null)}>
+                取消
+              </button>
+            </div>
+          </form>
+        )}
+        {data.isPending ? (
+          <div className="empty" role="status">
+            加载中…
+          </div>
+        ) : data.isError ? (
+          <div className="empty" role="alert">
+            加载失败 <button onClick={() => void data.refetch()}>重试</button>
+          </div>
+        ) : rows.length === 0 ? (
+          <div className="empty">
+            {kind === 'projects' && systems.length === 0
+              ? '请先添加系统，再创建项目。'
+              : `暂无${label}`}
+          </div>
+        ) : (
+          <table className="foundation-table">
+            <thead>
+              <tr>
+                <th>{label}名称</th>
+                <th>{kind === 'systems' ? '关联项目' : '所属系统'}</th>
+                {canManage && <th className="foundation-action-cell">操作</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.id}>
+                  <td>{row.name}</td>
+                  <td className="muted">
+                    {kind === 'systems'
+                      ? projects.filter((project) => project.system_id === row.id).length
+                      : (systems.find((system) => system.id === (row as Project).system_id)?.name ??
+                        '—')}
+                  </td>
+                  {canManage && (
+                    <td className="foundation-action-cell">
+                      <button
+                        disabled={busy}
+                        onClick={() =>
+                          setEditor({
+                            id: row.id,
+                            name: row.name,
+                            systemId: (row as Project).system_id ?? '',
+                          })
+                        }
+                      >
+                        编辑
+                      </button>
+                      <button className="error" disabled={busy} onClick={() => void remove(row)}>
+                        删除
+                      </button>
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
     </>
   );
 }
+
+// Keep existing plugin URLs available while their navigation moves to one data module.
+export const PluginDomainPage = FoundationDataPage;

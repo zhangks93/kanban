@@ -14,6 +14,10 @@ API 需要 `APP_BASE_URL`、至少 32 个随机字符的 `APP_SESSION_SECRET`、
 
 生产中取消 `FEISHU_BASE_URL`，设置 `NODE_ENV=production`。Cookie 将启用 Secure、HttpOnly、SameSite=Lax。配置同源 HTTPS；Mutation Origin 必须与 `APP_BASE_URL` 的 origin 完全一致。
 
+公开看板使用 `/share/:token`，无需飞书登录；只有有效分享凭证可读取任务摘要，修改任务仍要求内部登录和权限。需求与工单提报进入内部待受理列表，联系人信息不出现在公开接口中。迁移会将旧研发系统与运维服务迁入共享系统；旧研发模块及任务关联保留，不会被当成项目。已有泳道的项目编号、负责人和日期保持原样，可在基础数据中新建项目，再在任务或泳道设置中关联。
+
+公开提报按看板和访客 IP 限制为每 10 分钟 10 次。若通过反向代理部署，设置 `TRUSTED_PROXY_CIDRS` 为实际代理来源 IP/CIDR（本机 Nginx 如 `127.0.0.1/32,::1/128`），并由代理覆盖 `X-Forwarded-For`，以便正确区分访客。不要把不受信任的来源加入该配置。未配置时忽略转发头，按直接连接地址计数。
+
 ## 数据库
 
 先备份已有生产数据，再运行 `SUPABASE_DB_URL=... pnpm db:migrate`。数据库版本为 PostgreSQL 15+，需要 `pg_trgm`。迁移和平台 API 使用可创建扩展的数据库账号；生产账号权限可以进一步分离，但所有 Core transaction functions、trigger functions、sequences 与所需表的权限必须完整授权给 API 私有账号。
@@ -34,7 +38,10 @@ server {
   server_name work.example.com;
   # ssl_certificate / ssl_certificate_key 由部署环境管理
   root /srv/work/apps/web/dist;
-  location /api/ { proxy_pass http://127.0.0.1:3001; }
+  location /api/ {
+    proxy_set_header X-Forwarded-For $remote_addr;
+    proxy_pass http://127.0.0.1:3001;
+  }
   location /auth/ { proxy_pass http://127.0.0.1:3001; }
   location / { try_files $uri $uri/ /index.html; }
 }

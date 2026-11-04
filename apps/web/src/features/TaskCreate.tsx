@@ -157,12 +157,12 @@ export function TaskCreate({
               </option>
             ))}
           </select>
-          <small className="muted">按斐波那契档位估算；较大任务建议拆分。1 天按 8 小时对比。</small>
+          <small className="muted">1 天 = 8 小时</small>
           {errors.estimateDays && <span className="error">{errors.estimateDays.message}</span>}
         </label>
         {data.board.lane_mode === 'manual' && (
           <label>
-            持久泳道
+            泳道
             <select {...register('laneId')}>
               <option value="">未分组</option>
               {data.lanes

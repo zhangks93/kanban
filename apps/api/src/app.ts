@@ -5,6 +5,8 @@ import { buildRegistry, installedPlugins } from './plugins/registry';
 import { registerPlugins } from './modules/plugins';
 import { registerFocus } from './modules/focus';
 import { registerBoards } from './modules/boards';
+import { registerBoardSharing } from './modules/board-sharing';
+import { registerFoundationData } from './modules/foundation-data';
 import { registerTasks } from './modules/tasks';
 import { registerWorkLogs } from './modules/work-logs';
 import { registerCollaboration } from './modules/collaboration';
@@ -19,6 +21,10 @@ import { ZodError } from 'zod';
 export async function buildApp(plugins = installedPlugins) {
   const registry = buildRegistry(plugins);
   const app = Fastify({
+    trustProxy:
+      process.env.TRUSTED_PROXY_CIDRS?.split(',')
+        .map((value) => value.trim())
+        .filter(Boolean) ?? false,
     logger:
       process.env.NODE_ENV === 'test'
         ? false
@@ -63,6 +69,8 @@ export async function buildApp(plugins = installedPlugins) {
   await registerAuth(app);
   await registerWorkspaces(app);
   await registerBoards(app, registry.templates);
+  await registerBoardSharing(app);
+  await registerFoundationData(app);
   await registerPlugins(app, registry);
   await registerTasks(app);
   await registerWorkLogs(app);

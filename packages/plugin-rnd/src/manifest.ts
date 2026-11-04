@@ -30,6 +30,6 @@ export const manifest: WorkPluginManifest = {
   laneExtensions: [{ key: 'project', name: '研发项目' }],
   groupProviders: [
     { key: 'system', name: '系统', field: 'system_id' },
-    { key: 'module', name: '模块', field: 'module_id' },
+    { key: 'project', name: '项目', field: 'project_id' },
   ],
 };

@@ -71,7 +71,7 @@ test('rapid Participant edits serialize returned versions; Participant becomes R
   await expect(dialog.getByRole('button', { name: '参与人', exact: true })).toHaveText('许晴');
   await expect(dialog.getByRole('button', { name: '点亮任务', exact: true })).toBeDisabled();
 });
-test('enabled plugin nav, domain objects and dependency guard are visible', async ({ page }) => {
+test('unified foundation data and the plugin dependency guard are visible', async ({ page }) => {
   await login(page);
   await page.goto('/workspaces/alpha/settings/plugins');
   await expect(page.getByText('研发管理', { exact: true })).toBeVisible();
@@ -79,10 +79,17 @@ test('enabled plugin nav, domain objects and dependency guard are visible', asyn
   await row.getByRole('button', { name: '停用', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('请先归档依赖此插件的看板');
   await page.goto('/workspaces/alpha/rnd/systems');
-  await expect(page.getByRole('heading', { name: '研发系统与模块' })).toBeVisible();
-  await expect(page.locator('.domain-row').filter({ hasText: 'Core' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '基础数据', exact: true })).toBeVisible();
+  await expect(page.getByRole('row').filter({ hasText: '工作平台' }).first()).toBeVisible();
+  await page
+    .getByRole('navigation', { name: '基础数据分类' })
+    .getByRole('button', { name: /^项目/ })
+    .click();
+  await expect(page.getByRole('row').filter({ hasText: 'Core' })).toHaveCount(0);
   await page.goto('/workspaces/beta/boards');
+  await expect(page.getByRole('link', { name: '基础数据', exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: '研发系统', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: '运维服务', exact: true })).toHaveCount(0);
 });
 
 test('My Work offers one-for-one replacement when global WIP is full', async ({ page }) => {

@@ -5,7 +5,7 @@ export const server: WorkPluginServer = {
     ctx.registerTaskExtension({
       key: 'rnd',
       table: 'rnd_task_ext',
-      fields: ['system_id', 'module_id'],
+      fields: ['system_id', 'project_id', 'module_id'],
       domainTables: ['rnd_system', 'rnd_module'],
     });
   },

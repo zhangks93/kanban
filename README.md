@@ -15,7 +15,8 @@
 - **工时管理**：按斐波那契档位估算天数，按日期登记实际投入与工作说明，跨任务按人员、日期和任务统计，并对比预估与累计工时。
 - **个人工作管理**：跨工作空间的 My Work、全局 WIP 上限、Focus / Unfocus，以及达到上限后的任务替换。
 - **访问控制**：工作空间与看板角色、受限看板、账号停用、成员撤权、审计与最后一位有效 Owner 保护。
-- **场景扩展**：研发插件提供 System / Module；运维插件提供 Service / Severity 与事件属性，支持按工作空间启停。
+- **基础数据**：工作空间统一维护系统和项目，研发任务关联系统与项目，运维任务复用系统并记录严重程度与事件属性。
+- **公开分享**：看板管理员可开启、关闭或重置只读分享链接。研发与运维公开页分别提供需求、工单提报入口，访客提报由内部受理后转为任务。
 - **交互体验**：任务快捷预览与完整详情、搜索、通知、Intake、移动端布局与长列表虚拟化。
 
 技术栈：TypeScript、React 19、Vite、TanStack Router / Query、Fastify、PostgreSQL、pnpm workspace。认证由服务端飞书 OAuth 与 HttpOnly Session Cookie 提供；浏览器仅访问同源 API。
@@ -98,6 +99,7 @@ pnpm dev
 | `APP_SESSION_SECRET`                 | 自动生成     | `pnpm setup` / `pnpm dev` 生成并保存；生产须显式提供至少 32 字符的独立随机密钥 |
 | `APP_BASE_URL`                       | 否           | 默认 `http://localhost:5173`，OAuth 回调与请求 Origin 的基准                   |
 | `API_PORT`                           | 否           | 默认 `3001`，Web 开发代理自动跟随                                              |
+| `TRUSTED_PROXY_CIDRS`                | 否           | 逗号分隔的受信任代理 IP/CIDR，用于解析访客 IP；默认不信任代理头                   |
 | `NODE_ENV`                           | 否           | 默认 `development`，生产设为 `production`                                      |
 | `SENTRY_DSN`                         | 否           | API 错误监控                                                                   |
 | `VITE_SENTRY_DSN`                    | 否           | Web 错误监控                                                                   |
