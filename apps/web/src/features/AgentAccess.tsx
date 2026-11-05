@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bot, CheckCircle2, Clock3, ShieldCheck, Terminal, XCircle } from 'lucide-react';
 import { api, post } from '../api/client';
 import { useApp } from '../lib/context';
+import { EmptyState, PageHeader, StatCard } from '../components/PageLayout';
 import '../styles/agent-access.css';
 
 type Scope = 'read' | 'write';
@@ -80,6 +81,11 @@ export function AgentAccess() {
   const pending = request.data?.status === 'pending' && !expired && !decision;
   const canWrite = request.data?.scopes.includes('write');
   const selectedWorkspace = workspaces.find((w) => w.id === workspaceId && w.status === 'active');
+  const activeGrants = (authorizations.data ?? []).filter(
+    (grant) => !grant.revokedAt && Date.parse(grant.expiresAt) > now,
+  );
+  const writeGrants = activeGrants.filter((grant) => grant.scopes.includes('write')).length;
+  const loginCommand = `work auth login --server ${window.location.origin}`;
 
   async function decide(action: 'approve' | 'deny') {
     setBusy(true);
@@ -115,19 +121,22 @@ export function AgentAccess() {
   }
 
   return (
-    <div className="agent-access">
-      <header className="page-heading">
-        <div>
-          <h1>Agent 访问</h1>
-          <p className="muted">通过 CLI 委托 Agent 查询和处理工作，授权范围由你决定。</p>
-        </div>
-        <ShieldCheck size={24} aria-hidden="true" />
-      </header>
+    <div className="page-layout agent-access">
+      <PageHeader
+        title="Agent 访问"
+        description="连接你的工作助手，按需授予查询和任务维护权限。"
+        actions={
+          <span className="identity-pill">
+            <ShieldCheck size={16} aria-hidden="true" />
+            {me.display_name}
+          </span>
+        }
+      />
       <div className="agent-content">
         <section className="agent-boundary" aria-label="授权规则">
           <ShieldCheck size={20} aria-hidden="true" />
           <div>
-            <strong>始终以你的飞书身份和现有权限操作</strong>
+            <strong>由你授权，始终以你的现有权限操作</strong>
             <p>
               每份授权仅适用于一个工作空间，并有独立的有效期。你的账号停用、成员资格变更或看板撤权后，Agent
               的访问也会受到限制。你可以随时撤销授权。
@@ -273,29 +282,66 @@ export function AgentAccess() {
             )}
           </section>
         ) : (
-          <section className="agent-card" aria-labelledby="agent-connect-title">
+          <section className="agent-card agent-connect-card" aria-labelledby="agent-connect-title">
             <div className="agent-section-heading">
               <Terminal size={20} aria-hidden="true" />
               <h2 id="agent-connect-title">连接 Agent</h2>
             </div>
-            <p className="muted">
-              在 CLI 中运行登录命令，打开它提供的授权链接；也可以输入 CLI 显示的验证码。
-            </p>
-            <form className="agent-code-entry" action="/agent-access" method="get">
-              <label htmlFor="agent-user-code">设备验证码</label>
-              <div>
-                <input
-                  id="agent-user-code"
-                  name="code"
-                  required
-                  maxLength={32}
-                  placeholder="XXXX-XXXX-XXXX"
-                  autoComplete="off"
-                  spellCheck={false}
-                />
-                <button type="submit">查看请求</button>
-              </div>
-            </form>
+            <p className="muted">使用 Work CLI 连接工作助手。每次授权均需由你在浏览器中确认。</p>
+            <ol className="agent-connect-steps">
+              <li>
+                <span className="agent-step-number" aria-hidden="true">
+                  1
+                </span>
+                <div>
+                  <strong>在终端发起登录</strong>
+                  <p className="muted">已安装 Work CLI 后，运行以下命令，默认申请只读访问。</p>
+                  <pre className="agent-command">
+                    <code>{loginCommand}</code>
+                  </pre>
+                  <p className="muted">
+                    需要维护任务时，在命令末尾添加 <code>--write</code> 申请写入权限。
+                  </p>
+                </div>
+              </li>
+              <li>
+                <span className="agent-step-number" aria-hidden="true">
+                  2
+                </span>
+                <div>
+                  <strong>打开链接并确认授权</strong>
+                  <p className="muted">核对终端显示的验证码，选择工作空间、权限与有效期。</p>
+                </div>
+              </li>
+              <li>
+                <span className="agent-step-number" aria-hidden="true">
+                  3
+                </span>
+                <div>
+                  <strong>返回终端开始使用</strong>
+                  <p className="muted">登录成功后，Agent 即可在授权范围内查询和处理工作。</p>
+                </div>
+              </li>
+            </ol>
+            <div className="agent-code-entry-panel">
+              <h3>已有设备验证码？</h3>
+              <p className="muted">也可以输入终端中的验证码，直接查看待确认的请求。</p>
+              <form className="agent-code-entry" action="/agent-access" method="get">
+                <label htmlFor="agent-user-code">设备验证码</label>
+                <div>
+                  <input
+                    id="agent-user-code"
+                    name="code"
+                    required
+                    maxLength={32}
+                    placeholder="XXXX-XXXX-XXXX"
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
+                  <button type="submit">查看请求</button>
+                </div>
+              </form>
+            </div>
           </section>
         )}
 
@@ -313,18 +359,40 @@ export function AgentAccess() {
             </button>
           </div>
           <p className="muted">这里显示由你确认的 CLI 授权。时间均为北京时间。</p>
+          <div className="stat-grid agent-authorization-summary">
+            <StatCard
+              label="有效授权"
+              value={authorizations.isPending ? '—' : activeGrants.length}
+              detail="当前仍可使用"
+              icon={<Bot size={16} />}
+            />
+            <StatCard
+              label="只读访问"
+              value={authorizations.isPending ? '—' : activeGrants.length - writeGrants}
+              detail="查询看板和任务"
+            />
+            <StatCard
+              label="查询与修改"
+              value={authorizations.isPending ? '—' : writeGrants}
+              detail="仍受你的编辑权限约束"
+            />
+          </div>
           {revokeError && (
             <p className="error" role="alert">
               撤销失败：{revokeError}
             </p>
           )}
-          {authorizations.isPending && <p role="status">正在加载授权…</p>}
+          {authorizations.isPending && <EmptyState title="正在加载授权…" tone="loading" />}
           {authorizations.isError && (
-            <p className="error" role="alert">
-              授权加载失败，请点击刷新重试。
-            </p>
+            <EmptyState title="授权加载失败" description="请点击刷新重试。" tone="error" />
           )}
-          {authorizations.data?.length === 0 && <div className="empty">暂无 Agent 授权</div>}
+          {authorizations.data?.length === 0 && (
+            <EmptyState
+              title="暂无 Agent 授权"
+              description="连接并确认一个 Agent 后，可在这里查看和撤销授权。"
+              icon={<Bot size={22} />}
+            />
+          )}
           <div className="agent-grants">
             {authorizations.data?.map((grant) => {
               const active = !grant.revokedAt && Date.parse(grant.expiresAt) > now;
@@ -340,9 +408,11 @@ export function AgentAccess() {
                         {grant.revokedAt ? '已撤销' : active ? '有效' : '已到期'}
                       </span>
                     </div>
-                    <p>
-                      {grant.workspaceName || grant.workspaceId} ·{' '}
-                      {grant.scopes.includes('write') ? '查询与修改' : '只读'}
+                    <p className="agent-grant-summary">
+                      <span>{grant.workspaceName || grant.workspaceId}</span>
+                      <span className="role-badge">
+                        {grant.scopes.includes('write') ? '查询与修改' : '只读'}
+                      </span>
                     </p>
                     <p className="muted">
                       {time(grant.createdAt)} 授权 · {time(grant.expiresAt)} 到期

@@ -1,0 +1,178 @@
+/* Effort entry and reports. Tables scroll independently on narrow screens. */
+.card-effort,
+.effort-summary,
+.work-log-meta,
+.work-log-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+.card-effort {
+  margin-top: 8px;
+  font-size: var(--font-xs);
+}
+.task-work-logs {
+  margin: 24px 0;
+}
+.effort-summary {
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+  background: var(--surface);
+  font-size: var(--font-sm);
+}
+.task-work-logs fieldset {
+  min-width: 0;
+  margin: 20px 0;
+  padding: 0;
+  border: 0;
+}
+.task-work-logs legend {
+  margin-bottom: 12px;
+  font-weight: 600;
+}
+.task-work-logs label {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 12px;
+  font-size: var(--font-sm);
+}
+.work-log-row {
+  padding: 16px 0;
+  border-top: 1px solid var(--border);
+}
+.work-log-row p {
+  margin: 8px 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.work-log-meta {
+  font-size: var(--font-xs);
+  color: var(--muted);
+}
+.work-log-actions {
+  margin-top: 10px;
+}
+.work-report {
+  display: grid;
+  gap: 24px;
+  min-width: 0;
+}
+.report-filters {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 16px;
+  align-items: end;
+}
+.report-filters label {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  font-size: var(--font-sm);
+  color: var(--muted);
+}
+.report-filters select {
+  width: 100%;
+  max-width: 100%;
+  color: var(--text);
+}
+.report-filters input {
+  width: 100%;
+  min-width: 0;
+  color: var(--text);
+}
+.report-summary {
+  margin: 0;
+}
+.report-breakdowns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+}
+.report-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.report-row:first-child {
+  padding-top: 0;
+}
+.report-row:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+.report-row strong {
+  font-size: var(--font-md);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.report-table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+}
+.report-table {
+  width: 100%;
+  min-width: 640px;
+  border-collapse: collapse;
+  font-size: var(--font-sm);
+}
+.report-table th,
+.report-table td {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+.report-table th {
+  background: var(--surface);
+  color: var(--muted);
+  font-size: var(--font-xs);
+  font-weight: 500;
+  white-space: nowrap;
+}
+.report-table td:not(:first-child) {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.report-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.report-table tbody tr:hover {
+  background: #fafcfb;
+}
+.report-table a {
+  display: block;
+  max-width: 400px;
+  font-size: var(--font-md);
+  line-height: 1.6;
+}
+@media (max-width: 1200px) {
+  .report-filters {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 900px) {
+  .report-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .report-breakdowns {
+    gap: 20px;
+  }
+}
+@media (max-width: 640px) {
+  .report-filters,
+  .report-breakdowns {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .work-report {
+    gap: 16px;
+  }
+  .report-table th,
+  .report-table td {
+    padding: 12px;
+  }
+}

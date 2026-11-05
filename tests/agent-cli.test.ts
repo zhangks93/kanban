@@ -3,7 +3,14 @@ import { mkdtemp, readFile, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runCli, type CliIO } from '../packages/cli/src/cli';
-import { normalizeServer, readCredentials, saveCredentials } from '../packages/cli/src/config';
+import {
+  normalizeServer,
+  readCredentials,
+  saveCredentials,
+  readPending,
+  savePending,
+  pendingFile,
+} from '../packages/cli/src/config';
 
 const taskId = '90000000-0000-4000-8000-000000000001';
 const directories: string[] = [];
@@ -241,4 +248,305 @@ test('logout distinguishes unavailable authentication from confirmed remote revo
   expect(data.warning).toContain('could not be confirmed');
   expect(data.note).toBe('Remove WORK_TOKEN from the caller environment');
   expect(h.output.join('')).not.toContain('Token revoked');
+});
+
+test('commands, exact schemas, and allowlisted bundled skills are discoverable without auth', async () => {
+  const h = await harness();
+  for (const args of [
+    ['commands', '--json'],
+    ['schema'],
+    ['schema', 'tasks.update'],
+    ['skills', 'list'],
+  ])
+    expect(await runCli(args, h.io, {}, h.fetcher)).toBe(0);
+  const commands = JSON.parse(h.output[0]).data.commands;
+  expect(commands.some((item: { id: string }) => item.id === 'tasks.+mine')).toBe(true);
+  const schema = JSON.parse(h.output[2]).data;
+  expect(schema.operation.id).toBe('tasks.update');
+  expect(schema.operation.body.required).toContain('expectedVersion');
+  expect(await runCli(['skills', 'read', 'work-shared'], h.io, {}, h.fetcher)).toBe(0);
+  expect(h.output.at(-1)).toContain('work-shared');
+  expect(await runCli(['skills', 'read', '../../etc/passwd'], h.io, {}, h.fetcher)).toBe(2);
+  expect(await runCli(['schema', 'arbitrary.unknown'], h.io, {}, h.fetcher)).toBe(2);
+  expect(h.fetcher).not.toHaveBeenCalled();
+});
+
+test('global server options before commands preserve discovery JSON flags and task JSON values', async () => {
+  const h = await harness();
+  for (const prefix of [['--server', h.env.WORK_SERVER], [`--server=${h.env.WORK_SERVER}`]]) {
+    expect(await runCli([...prefix, 'commands', '--json'], h.io, {}, h.fetcher)).toBe(0);
+    expect(JSON.parse(h.output.at(-1)!).data.commands).toEqual(expect.any(Array));
+  }
+  expect(
+    await runCli(
+      ['--server', h.env.WORK_SERVER, 'commands', '--json', '--json'],
+      h.io,
+      {},
+      h.fetcher,
+    ),
+  ).toBe(2);
+  expect(JSON.parse(h.errors.at(-1)!).error.message).toContain('Duplicate option: --json');
+  expect(
+    await runCli(
+      [
+        '--server',
+        h.env.WORK_SERVER,
+        'tasks',
+        'update',
+        taskId,
+        '--json',
+        '{"title":"new","expectedVersion":2}',
+        '--dry-run',
+      ],
+      h.io,
+      {},
+      h.fetcher,
+    ),
+  ).toBe(0);
+  expect(JSON.parse(h.output.at(-1)!).data.body).toEqual({ title: 'new', expectedVersion: 2 });
+  expect(h.fetcher).not.toHaveBeenCalled();
+});
+
+test('nonblocking login stores a private pending secret and auth complete resumes without printing it', async () => {
+  const h = await harness();
+  const env = { WORK_CONFIG_DIR: h.directory, WORK_SERVER: h.env.WORK_SERVER };
+  h.fetcher.mockResolvedValueOnce(
+    Response.json({
+      deviceCode: 'pending-device-secret',
+      userCode: 'ABCD-1234-EF56',
+      verificationUri: h.env.WORK_SERVER + '/agent-access?code=ABCD-1234-EF56',
+      expiresIn: 600,
+      interval: 5,
+    }),
+  );
+  expect(await runCli(['auth', 'login', '--no-wait', '--write'], h.io, env, h.fetcher)).toBe(0);
+  expect(h.fetcher).toHaveBeenCalledTimes(1);
+  expect(JSON.parse(h.output[0]).data).toMatchObject({
+    status: 'pending',
+    scopes: ['read', 'write'],
+  });
+  expect((await readPending(env))?.deviceCode).toBe('pending-device-secret');
+  if (process.platform !== 'win32') expect((await stat(pendingFile(env))).mode & 0o777).toBe(0o600);
+  h.fetcher.mockResolvedValueOnce(
+    Response.json({
+      status: 'approved',
+      accessToken: 'completed-access-secret',
+      expiresAt: new Date(h.io.now() + 60000).toISOString(),
+      authorization: { id: taskId, scopes: ['read', 'write'] },
+    }),
+  );
+  expect(
+    await runCli(['auth', 'complete'], h.io, { WORK_CONFIG_DIR: h.directory }, h.fetcher),
+  ).toBe(0);
+  expect(await readPending(env)).toBeUndefined();
+  expect((await readCredentials(env))?.accessToken).toBe('completed-access-secret');
+  expect(h.output.join('') + h.errors.join('')).not.toContain('pending-device-secret');
+  expect(h.output.join('') + h.errors.join('')).not.toContain('completed-access-secret');
+});
+
+test('pending auth is origin-bound, retained on network errors and removed on denial or expiry', async () => {
+  const h = await harness();
+  const pending = {
+    server: h.env.WORK_SERVER,
+    deviceCode: 'private-device',
+    userCode: 'ABCD',
+    verificationUri: h.env.WORK_SERVER + '/agent-access',
+    expiresAt: new Date(h.io.now() + 60000).toISOString(),
+    interval: 5,
+    scopes: ['read'],
+  };
+  const env = { WORK_CONFIG_DIR: h.directory };
+  await savePending(env, pending);
+  expect(
+    await runCli(
+      ['auth', 'complete', '--server', 'https://other.example.com'],
+      h.io,
+      env,
+      h.fetcher,
+    ),
+  ).toBe(3);
+  expect(h.fetcher).not.toHaveBeenCalled();
+  h.fetcher.mockRejectedValueOnce(new Error('offline'));
+  expect(await runCli(['auth', 'complete'], h.io, env, h.fetcher)).toBe(6);
+  expect(await readPending(env)).toBeDefined();
+  h.fetcher.mockResolvedValueOnce(Response.json({ status: 'denied' }));
+  expect(await runCli(['auth', 'complete'], h.io, env, h.fetcher)).toBe(1);
+  expect(await readPending(env)).toBeUndefined();
+  await savePending(env, { ...pending, expiresAt: new Date(h.io.now() - 1).toISOString() });
+  const calls = h.fetcher.mock.calls.length;
+  expect(await runCli(['auth', 'complete'], h.io, env, h.fetcher)).toBe(3);
+  expect(h.fetcher).toHaveBeenCalledTimes(calls);
+  expect(await readPending(env)).toBeUndefined();
+});
+
+test('auth check diagnoses missing scopes with recovery hints and a nonzero exit', async () => {
+  const h = await harness();
+  h.fetcher.mockImplementation(async () =>
+    Response.json({ user: { id: taskId }, authorization: { scopes: ['read'] } }),
+  );
+  expect(await runCli(['auth', 'check', '--scope', 'read'], h.io, h.env, h.fetcher)).toBe(0);
+  expect(JSON.parse(h.output[0]).data).toMatchObject({ granted: ['read'], missing: [] });
+  expect(await runCli(['auth', 'check', '--scope', 'write'], h.io, h.env, h.fetcher)).toBe(4);
+  const failure = JSON.parse(h.errors[0]).error;
+  expect(failure.detail.missing).toEqual(['write']);
+  expect(failure.detail.recovery[0]).toContain('--write --no-wait');
+});
+
+test('tasks +mine uses the current human ID and preserves query filters', async () => {
+  const h = await harness();
+  h.fetcher.mockResolvedValueOnce(Response.json({ user: { id: taskId } }));
+  expect(
+    await runCli(
+      ['tasks', '+mine', '--state-group', 'started', '--limit', '10'],
+      h.io,
+      h.env,
+      h.fetcher,
+    ),
+  ).toBe(0);
+  expect(String(h.fetcher.mock.calls[0][0])).toBe(h.env.WORK_SERVER + '/api/agent/v1/me');
+  const query = new URL(String(h.fetcher.mock.calls[1][0])).searchParams;
+  expect(query.get('responsibleUserId')).toBe(taskId);
+  expect(query.get('stateGroup')).toBe('started');
+  expect(query.get('limit')).toBe('10');
+});
+
+test('bounded pagination preserves filters and truthful truncation metadata with field projection', async () => {
+  const h = await harness();
+  h.fetcher
+    .mockResolvedValueOnce(
+      Response.json({
+        items: [{ id: 'a', title: 'A', version: 1, description_text: 'large' }],
+        nextCursor: 'cursor-a',
+      }),
+    )
+    .mockResolvedValueOnce(
+      Response.json({ items: [{ id: 'b', title: 'B', version: 2 }], nextCursor: 'cursor-b' }),
+    );
+  expect(
+    await runCli(
+      [
+        'tasks',
+        'list',
+        '--q',
+        'same',
+        '--page-all',
+        '--page-limit',
+        '2',
+        '--fields',
+        'id,title,version',
+      ],
+      h.io,
+      h.env,
+      h.fetcher,
+    ),
+  ).toBe(0);
+  expect(h.fetcher).toHaveBeenCalledTimes(2);
+  const second = new URL(String(h.fetcher.mock.calls[1][0])).searchParams;
+  expect(second.get('q')).toBe('same');
+  expect(second.get('cursor')).toBe('cursor-a');
+  const data = JSON.parse(h.output[0]).data;
+  expect(data.items).toEqual([
+    { id: 'a', title: 'A', version: 1 },
+    { id: 'b', title: 'B', version: 2 },
+  ]);
+  expect(data.nextCursor).toBe('cursor-b');
+  expect(data.pagination).toEqual({
+    pagesFetched: 2,
+    itemsReturned: 2,
+    truncated: true,
+    reason: 'page-limit',
+  });
+});
+
+test('pagination stops repeated cursors, and NDJSON emits page, row, and final summary', async () => {
+  const h = await harness();
+  h.fetcher
+    .mockResolvedValueOnce(
+      Response.json({ items: [{ id: 'a', title: 'A', version: 1 }], nextCursor: 'same' }),
+    )
+    .mockResolvedValueOnce(
+      Response.json({ items: [{ id: 'b', title: 'B', version: 2 }], nextCursor: 'same' }),
+    );
+  expect(
+    await runCli(
+      ['tasks', 'list', '--page-all', '--format', 'ndjson', '--fields', 'id'],
+      h.io,
+      h.env,
+      h.fetcher,
+    ),
+  ).toBe(0);
+  expect(h.fetcher).toHaveBeenCalledTimes(2);
+  const records = h.output.map((value) => JSON.parse(value));
+  expect(records.map((record) => record.type)).toEqual(['page', 'row', 'page', 'row', 'summary']);
+  expect(records[1].data).toEqual({ id: 'a' });
+  expect(records.at(-1).pagination).toMatchObject({ truncated: true, reason: 'repeated-cursor' });
+});
+
+test('an error after streamed pages returns nonzero with partial coverage and no false final summary', async () => {
+  const h = await harness();
+  h.fetcher
+    .mockResolvedValueOnce(Response.json({ items: [{ id: 'a' }], nextCursor: 'next' }))
+    .mockRejectedValueOnce(new Error('offline'));
+  expect(
+    await runCli(['tasks', 'list', '--page-all', '--format', 'ndjson'], h.io, h.env, h.fetcher),
+  ).toBe(6);
+  expect(h.output.map((value) => JSON.parse(value).type)).toEqual(['page', 'row']);
+  expect(JSON.parse(h.errors[0]).error.detail.partial).toEqual({
+    pagesFetched: 1,
+    itemsFetched: 1,
+    emittedRows: 1,
+    nextCursor: 'next',
+  });
+});
+
+test('read projections reject prototype names and expressions, and writes reject presentation flags', async () => {
+  const h = await harness();
+  for (const fields of ['__proto__', 'constructor', 'id,__proto__', 'title.toString', 'id,id'])
+    expect(await runCli(['tasks', 'list', '--fields', fields], h.io, h.env, h.fetcher)).toBe(2);
+  expect(await runCli(['tasks', 'list', '--page-limit', '2'], h.io, h.env, h.fetcher)).toBe(2);
+  expect(
+    await runCli(['tasks', 'list', '--page-all', '--page-limit', '101'], h.io, h.env, h.fetcher),
+  ).toBe(2);
+  expect(
+    await runCli(
+      [
+        'tasks',
+        'update',
+        taskId,
+        '--json',
+        '{"title":"x","expectedVersion":1}',
+        '--format',
+        'table',
+      ],
+      h.io,
+      h.env,
+      h.fetcher,
+    ),
+  ).toBe(2);
+  expect(h.fetcher).not.toHaveBeenCalled();
+  h.fetcher.mockResolvedValueOnce(
+    Response.json({ id: taskId, title: 'line\n\u001b[31mvalue', version: 1 }),
+  );
+  expect(
+    await runCli(
+      ['tasks', 'get', taskId, '--format', 'table', '--fields', 'title,version'],
+      h.io,
+      h.env,
+      h.fetcher,
+    ),
+  ).toBe(0);
+  expect(h.output[0]).toBe('title | version\n--- | ---\n');
+  expect(h.output.join('')).not.toContain('\u001b');
+});
+
+test('the client rejects a server page larger than the requested bound before emitting rows', async () => {
+  const h = await harness();
+  h.fetcher.mockResolvedValueOnce(
+    Response.json({ items: [{ id: 'a' }, { id: 'b' }], nextCursor: null }),
+  );
+  expect(
+    await runCli(['tasks', 'list', '--limit', '1', '--format', 'ndjson'], h.io, h.env, h.fetcher),
+  ).toBe(6);
+  expect(h.output).toEqual([]);
+  expect(JSON.parse(h.errors[0]).error.code).toBe('INVALID_RESPONSE');
 });

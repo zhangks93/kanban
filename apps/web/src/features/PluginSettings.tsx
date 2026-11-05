@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useApp } from '../lib/context';
 import { api, post } from '../api/client';
 import { useState } from 'react';
+import { PageHeader, EmptyState } from '../components/PageLayout';
 export function PluginSettings() {
   const { workspace, me, notify } = useApp();
   const qc = useQueryClient();
@@ -17,12 +18,20 @@ export function PluginSettings() {
   const can = ['owner', 'admin'].includes(workspace?.role ?? '');
   return (
     <>
-      <header className="page-heading">
-        <div>
-          <h1>插件设置</h1>
-        </div>
-      </header>
+      <PageHeader
+        title="插件设置"
+        eyebrow="空间管理"
+        description="按团队工作方式启用场景扩展，基础数据在整个空间中共享。"
+      />
       <div className="workspace-list">
+        {plugins.isPending && <EmptyState title="正在加载插件…" tone="loading" />}
+        {plugins.isError && (
+          <EmptyState
+            title="无法加载插件"
+            tone="error"
+            action={<button onClick={() => void plugins.refetch()}>重试</button>}
+          />
+        )}
         {plugins.data?.map((p) => (
           <div className="workspace-row" key={p.key}>
             <div>

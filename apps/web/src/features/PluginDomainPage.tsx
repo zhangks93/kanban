@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState, type FormEvent } from 'react';
 import { Plus } from 'lucide-react';
+import { PageHeader } from '../components/PageLayout';
 import { useApp } from '../lib/context';
 import { api, post } from '../api/client';
 import '../styles/foundation-data.css';
@@ -79,19 +80,25 @@ export function FoundationDataPage() {
   if (!workspace) return <div className="empty">请选择工作空间</div>;
   return (
     <>
-      <header className="page-heading">
-        <h1>基础数据</h1>
-        {canManage && (
-          <button
-            className="primary"
-            disabled={busy || (kind === 'projects' && systems.length === 0)}
-            onClick={() => setEditor({ name: '', systemId: systemFilter || systems[0]?.id || '' })}
-          >
-            <Plus size={16} />
-            添加{label}
-          </button>
-        )}
-      </header>
+      <PageHeader
+        title="基础数据"
+        eyebrow="空间协作"
+        description="统一维护系统和项目，为研发与运维任务提供一致的业务关联。"
+        actions={
+          canManage && (
+            <button
+              className="primary"
+              disabled={busy || (kind === 'projects' && systems.length === 0)}
+              onClick={() =>
+                setEditor({ name: '', systemId: systemFilter || systems[0]?.id || '' })
+              }
+            >
+              <Plus size={16} />
+              添加{label}
+            </button>
+          )
+        }
+      />
       <div className="foundation-data">
         <div className="foundation-toolbar">
           <nav className="foundation-tabs" aria-label="基础数据分类">

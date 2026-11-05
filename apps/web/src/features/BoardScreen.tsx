@@ -1,10 +1,9 @@
 import { BoardManage } from './BoardManage';
 import { BoardShare } from './BoardShare';
-import { PluginLanePanel } from './PluginLanePanel';
 import { IntakePanel } from './IntakePanel';
 import { installedPlugins } from '../plugins/registry';
 
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { useLocation } from '@tanstack/react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -15,93 +14,20 @@ import {
   KeyboardSensor,
   useSensor,
   useSensors,
-  useDroppable,
   type DragEndEvent,
 } from '@dnd-kit/core';
-import {
-  SortableContext,
-  verticalListSortingStrategy,
-  sortableKeyboardCoordinates,
-} from '@dnd-kit/sortable';
-import { useVirtualizer } from '@tanstack/react-virtual';
+import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { generateKeyBetween } from 'fractional-indexing';
 import { Plus, Filter, Rows3, ChevronDown, Settings2, Share2 } from 'lucide-react';
-import type { Task, Board, BoardData, Worker, State } from '@work/shared';
+import type { Task, Board, BoardData, Worker } from '@work/shared';
 import { useApp } from '../lib/context';
 import { api, post } from '../api/client';
 import { useTaskMutations } from '../lib/task-mutations';
-import { CompactPopover, Modal } from '../components/ui';
-import { TaskCard } from '../components/TaskCard';
+import { CompactPopover } from '../components/ui';
+import { BoardCell, type Group } from './board/BoardCell';
+import { LaneManager } from './board/LaneManager';
 import { TaskCreate } from './TaskCreate';
 import { TaskDetail } from './TaskDetail';
-interface Group {
-  id: string;
-  name: string;
-}
-function BoardCell({
-  state,
-  group,
-  tasks,
-  onOpen,
-  onCreate,
-}: {
-  state: State;
-  group: Group;
-  tasks: Task[];
-  onOpen: (t: Task) => void;
-  onCreate: () => void;
-}) {
-  const drop = useDroppable({
-    id: `cell:${state.id}:${group.id}`,
-    data: { stateId: state.id, groupId: group.id },
-  });
-  const ref = useRef<HTMLDivElement>(null);
-  const virtual = useVirtualizer({
-    count: tasks.length,
-    getScrollElement: () => ref.current,
-    estimateSize: () => 116,
-    overscan: 3,
-  });
-  const virtualize = tasks.length > 20;
-  return (
-    <section
-      className={`board-cell ${drop.isOver ? 'drop-over' : ''}`}
-      ref={drop.setNodeRef}
-      aria-label={`${group.name} · ${state.name}`}
-    >
-      <SortableContext items={tasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
-        <div className="cell-scroll" ref={ref}>
-          {virtualize ? (
-            <div style={{ height: virtual.getTotalSize(), position: 'relative' }}>
-              {virtual.getVirtualItems().map((item) => (
-                <div
-                  key={tasks[item.index].id}
-                  ref={virtual.measureElement}
-                  data-index={item.index}
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    width: '100%',
-                    transform: `translateY(${item.start}px)`,
-                  }}
-                >
-                  <TaskCard task={tasks[item.index]} onOpen={() => onOpen(tasks[item.index])} />
-                </div>
-              ))}
-            </div>
-          ) : (
-            tasks.map((t) => <TaskCard key={t.id} task={t} onOpen={() => onOpen(t)} />)
-          )}
-        </div>
-      </SortableContext>
-      <button className="cell-create" onClick={onCreate}>
-        <Plus size={13} />
-        添加任务
-      </button>
-    </section>
-  );
-}
 export function BoardScreen() {
   const path = useLocation().pathname;
   const { workspace, notify } = useApp();
@@ -334,14 +260,20 @@ export function BoardScreen() {
   return (
     <>
       <header className="board-heading">
-        <span className="breadcrumb muted">
-          {workspace?.name}
-          <span>/</span>看板
-        </span>
-        <strong>{d.board.name}</strong>
-        <span className="mono muted">{filtered.length} 项</span>
+        <div className="board-heading-copy">
+          <span className="eyebrow">{workspace?.name} / 团队看板</span>
+          <h1>{d.board.name}</h1>
+        </div>
+        <div className="board-heading-summary">
+          <span className="status-pill">
+            {d.board.access_mode === 'restricted' ? '受限看板' : '空间协作'}
+          </span>
+          <span className="mono muted" data-testid="board-task-count">
+            {filtered.length} 项任务
+          </span>
+        </div>
       </header>
-      <div className="board-toolbar">
+      <div className="board-toolbar" role="toolbar" aria-label="看板工具">
         <CompactPopover
           trigger={
             <button>
@@ -454,9 +386,9 @@ export function BoardScreen() {
             泳道
           </button>
         )}
-        <button className="primary" onClick={() => setCreate({})}>
+        <button className="primary" aria-label="新建任务" onClick={() => setCreate({})}>
           <Plus size={14} />
-          新建任务
+          <span className="toolbar-label">新建任务</span>
         </button>
       </div>
       <DndContext
@@ -535,74 +467,5 @@ export function BoardScreen() {
       <LaneManager data={d} open={lanesOpen} onClose={() => setLanesOpen(false)} />
       {peek && <TaskDetail taskId={peek} data={d} onClose={() => setPeek(null)} />}
     </>
-  );
-}
-function LaneManager({
-  data,
-  open,
-  onClose,
-}: {
-  data: BoardData;
-  open: boolean;
-  onClose: () => void;
-}) {
-  const { notify } = useApp();
-  const mutations = useTaskMutations();
-  const [name, setName] = useState('');
-  const [rename, setRename] = useState<Record<string, string>>({});
-  async function save(path: string, body: unknown, method = 'POST') {
-    try {
-      await post(`/api/boards/${data.board.id}/lanes${path}`, body, method);
-      await mutations.refresh();
-    } catch (e) {
-      notify((e as Error).message);
-    }
-  }
-  return (
-    <Modal title="管理泳道" open={open} onOpenChange={(v) => !v && onClose()}>
-      <div className="lane-manager">
-        {data.lanes
-          .filter((l) => l.status === 'active')
-          .map((l, i) => (
-            <div className="lane-manager-row" key={l.id}>
-              <div>
-                <input
-                  aria-label={`${l.name}名称`}
-                  value={rename[l.id] ?? l.name}
-                  onChange={(e) => setRename({ ...rename, [l.id]: e.target.value })}
-                />
-                <button
-                  onClick={() => void save(`/${l.id}`, { name: rename[l.id] ?? l.name }, 'PATCH')}
-                >
-                  保存
-                </button>
-                <button
-                  aria-label={`上移${l.name}`}
-                  onClick={() => void save(`/${l.id}`, { sortOrder: i - 1 }, 'PATCH')}
-                >
-                  ↑
-                </button>
-                <button onClick={() => void save(`/${l.id}/archive`, {})}>归档</button>
-              </div>
-              <PluginLanePanel data={data} lane={l} />
-            </div>
-          ))}
-        <form
-          onSubmit={async (e) => {
-            e.preventDefault();
-            await save('', { name });
-            setName('');
-          }}
-        >
-          <input
-            placeholder="新泳道名称"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            required
-          />
-          <button>添加</button>
-        </form>
-      </div>
-    </Modal>
   );
 }

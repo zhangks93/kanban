@@ -1,18 +1,30 @@
 @import 'tailwindcss';
+
+/* Five sizes only: captions 12, labels 13, body 14, sections 18, titles 24.
+   Use weight, color, spacing and line-height for hierarchy within each level. */
 :root {
-  --bg: #f5f6f7;
-  --surface: #fbfbfc;
+  --font-xs: 12px;
+  --font-sm: 13px;
+  --font-md: 14px;
+  --font-lg: 18px;
+  --font-xl: 24px;
+  --bg: #f5f7f6;
+  --surface: #f8faf9;
   --panel: #fff;
-  --text: #24282e;
-  --muted: #737982;
-  --border: #e2e5e9;
-  --accent: #3b6355;
-  --accent-soft: #e8f0ec;
-  --danger: #a64646;
+  --text: #26352d;
+  --muted: #637067;
+  --border: #e2e8e4;
+  --border-strong: #cbd7cf;
+  --accent: #26734f;
+  --accent-hover: #1d5e40;
+  --accent-soft: #eaf4ee;
+  --danger: #a83d42;
+  --danger-soft: #fbefef;
+  --warning: #91662d;
   --r-sm: 4px;
-  --r-control: 6px;
-  --r-card: 8px;
-  --r-dialog: 10px;
+  --r-control: 7px;
+  --r-card: 10px;
+  --r-dialog: 14px;
   --s1: 4px;
   --s2: 8px;
   --s3: 12px;
@@ -20,6 +32,9 @@
   --s5: 20px;
   --s6: 24px;
   --s8: 32px;
+  --shadow-sm: 0 1px 2px #253b2d06;
+  --shadow-card: 0 2px 8px #253b2d06;
+  --shadow-overlay: 0 16px 48px #253b2d18;
   font-family:
     Inter,
     -apple-system,
@@ -28,10 +43,13 @@
     'PingFang SC',
     'Microsoft YaHei',
     sans-serif;
+  font-size: var(--font-md);
+  font-synthesis: none;
+  line-height: 1.5;
   color: var(--text);
   background: var(--bg);
-  font-size: 13px;
-  font-synthesis: none;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 * {
   box-sizing: border-box;
@@ -47,15 +65,28 @@ textarea {
   color: inherit;
 }
 button {
-  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 6px 12px;
   border: 1px solid var(--border);
-  background: var(--panel);
   border-radius: var(--r-control);
-  min-height: 32px;
-  padding: 4px 10px;
+  background: var(--panel);
+  font-size: var(--font-sm);
+  font-weight: 500;
+  line-height: 1.4;
+  cursor: pointer;
+  transition:
+    background-color 120ms,
+    border-color 120ms,
+    color 120ms,
+    box-shadow 120ms;
 }
 button:hover {
-  background: var(--bg);
+  background: var(--surface);
+  border-color: var(--border-strong);
 }
 button:disabled {
   cursor: not-allowed;
@@ -64,42 +95,83 @@ button:disabled {
 input,
 select,
 textarea {
-  border: 1px solid var(--border);
-  border-radius: var(--r-control);
-  padding: 6px 8px;
-  min-height: 32px;
-  background: var(--panel);
+  min-height: 36px;
   max-width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-control);
+  background: var(--panel);
+  font-size: var(--font-md);
+  line-height: 1.5;
+  transition:
+    border-color 120ms,
+    box-shadow 120ms;
+}
+input::placeholder,
+textarea::placeholder {
+  color: #89938d;
+}
+input:hover,
+select:hover,
+textarea:hover {
+  border-color: #acbdb1;
+}
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--accent);
 }
 textarea {
   resize: vertical;
 }
+input[type='checkbox'],
+input[type='radio'] {
+  min-height: 16px;
+  width: 16px;
+  padding: 0;
+  accent-color: var(--accent);
+}
 a {
   color: inherit;
   text-decoration: none;
+  transition: color 120ms;
 }
 a:hover {
   color: var(--accent);
 }
 :focus-visible {
   outline: 2px solid var(--accent);
-  outline-offset: 2px;
+  outline-offset: 3px;
+}
+::selection {
+  background: #cfe6d7;
+  color: var(--text);
 }
 .primary {
   background: var(--accent);
-  color: white;
+  color: #fff;
   border-color: var(--accent);
+  box-shadow: var(--shadow-sm);
 }
 .primary:hover {
-  background: #2e5043;
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+  color: #fff;
 }
 .muted {
   color: var(--muted);
 }
-.mono {
-  font-family: ui-monospace, monospace;
+.mono,
+code,
+pre {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-variant-numeric: tabular-nums;
-  font-size: 12px;
+}
+.mono {
+  font-size: var(--font-xs);
+}
+small {
+  font-size: var(--font-xs);
 }
 .error {
   color: var(--danger);
@@ -107,71 +179,84 @@ a:hover {
 svg {
   flex-shrink: 0;
 }
+h1,
+h2,
+h3 {
+  color: var(--text);
+  font-weight: 650;
+}
 h1 {
-  font-size: 20px;
   margin: 0;
-  font-weight: 600;
+  font-size: var(--font-xl);
+  line-height: 1.35;
+  letter-spacing: -0.025em;
 }
 h2 {
-  font-size: 16px;
-  margin: 0 0 12px;
-  font-weight: 600;
+  margin: 0 0 16px;
+  font-size: var(--font-lg);
+  line-height: 1.4;
+  letter-spacing: -0.015em;
 }
 h3 {
-  font-size: 14px;
-  font-weight: 600;
+  margin: 0 0 10px;
+  font-size: var(--font-md);
+  line-height: 1.5;
 }
 p {
-  line-height: 1.6;
+  line-height: 1.7;
 }
 .empty {
-  padding: 32px 16px;
+  padding: 40px 24px;
   color: var(--muted);
   text-align: center;
 }
 .dialog-overlay {
   position: fixed;
   inset: 0;
-  background: #24282e55;
+  background: #1f302b55;
   z-index: 80;
+  backdrop-filter: blur(2px);
 }
 .dialog {
   position: fixed;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: min(520px, calc(100vw - 32px));
+  width: min(540px, calc(100vw - 32px));
   max-height: 85dvh;
   overflow: auto;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: var(--r-dialog);
-  padding: 24px;
+  padding: 28px;
   z-index: 81;
-  box-shadow: 0 8px 40px #24282e20;
+  box-shadow: var(--shadow-overlay);
 }
 .dialog form {
   display: grid;
-  gap: 12px;
+  gap: 16px;
 }
 .dialog label {
   display: grid;
-  gap: 4px;
+  gap: 6px;
+  font-size: var(--font-sm);
 }
 .dialog-actions {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
   margin-top: 12px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
 }
 .popover {
   z-index: 90;
+  max-width: calc(100vw - 24px);
+  padding: 12px;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: var(--r-card);
-  padding: 12px;
-  box-shadow: 0 4px 20px #24282e12;
-  max-width: calc(100vw - 24px);
+  box-shadow: var(--shadow-overlay);
 }
 .tabs {
   display: flex;
@@ -183,10 +268,18 @@ p {
   border-bottom: 2px solid transparent;
   background: transparent;
   border-radius: 0;
+  color: var(--muted);
 }
 .tabs [data-state='active'] {
   border-color: var(--accent);
   color: var(--accent);
+  font-weight: 600;
+}
+@media (max-width: 640px) {
+  .dialog {
+    padding: 24px 20px;
+    max-height: 90dvh;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   *,

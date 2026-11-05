@@ -1,32 +1,44 @@
+/* Workspace foundation records: shared data-table treatment with inline editing. */
 .foundation-data {
-  max-width: 1120px;
-  padding: 0 32px 32px;
+  max-width: calc(100% - 64px);
+  margin: 24px 32px 32px;
+  padding: 0;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  background: var(--panel);
+  box-shadow: var(--shadow-sm);
 }
 .foundation-toolbar {
   display: flex;
+  align-items: center;
   justify-content: space-between;
   gap: 16px;
-  align-items: center;
-  min-height: 66px;
+  min-height: 72px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
 }
 .foundation-tabs {
   display: flex;
-  gap: 8px;
+  gap: 6px;
 }
 .foundation-tabs button {
-  border: 0;
+  padding: 7px 12px;
+  border: 1px solid transparent;
   background: transparent;
-  padding: 8px 12px;
   color: var(--muted);
+  font-size: var(--font-md);
 }
 .foundation-tabs button[aria-current] {
+  border-color: #d4e5da;
   background: var(--accent-soft);
   color: var(--accent);
   font-weight: 600;
 }
 .foundation-tabs span {
   margin-left: 4px;
-  font-size: 12px;
+  font-size: var(--font-xs);
+  font-variant-numeric: tabular-nums;
 }
 .foundation-table {
   width: 100%;
@@ -34,62 +46,89 @@
   text-align: left;
 }
 .foundation-table th {
+  background: var(--surface);
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--font-xs);
   font-weight: 500;
+  white-space: nowrap;
 }
 .foundation-table th,
 .foundation-table td {
-  padding: 14px 12px;
+  padding: 16px 20px;
   border-bottom: 1px solid var(--border);
+}
+.foundation-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.foundation-table tbody tr:hover {
+  background: #fafcfb;
 }
 .foundation-table .foundation-action-cell {
   text-align: right;
   white-space: nowrap;
 }
 .foundation-action-cell button {
-  padding: 4px 8px;
   margin-left: 6px;
-  background: transparent;
+  padding: 5px 8px;
+  min-height: 30px;
   border: 0;
+  background: transparent;
+  font-size: var(--font-sm);
+}
+.foundation-action-cell button:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 .foundation-editor {
   display: flex;
   align-items: end;
   flex-wrap: wrap;
-  gap: 14px;
-  background: var(--surface);
+  gap: 16px;
+  margin: 20px;
+  padding: 20px;
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 18px;
-  margin-bottom: 16px;
+  border-radius: var(--r-control);
+  background: var(--surface);
 }
 .foundation-editor label {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   min-width: 180px;
   flex: 1;
+  font-size: var(--font-sm);
+  color: var(--muted);
 }
 .foundation-actions {
   display: flex;
   gap: 8px;
 }
+@media (max-width: 900px) {
+  .foundation-data {
+    max-width: calc(100% - 40px);
+    margin: 20px;
+  }
+}
 @media (max-width: 640px) {
   .foundation-data {
-    padding: 0 16px 24px;
+    max-width: calc(100% - 28px);
+    margin: 16px 14px 24px;
   }
   .foundation-toolbar {
     flex-wrap: wrap;
-    padding: 10px 0;
-    gap: 8px;
+    padding: 14px;
+    gap: 12px;
   }
   .foundation-table th,
   .foundation-table td {
-    padding: 12px 4px;
+    padding: 12px;
   }
   .foundation-table td:first-child {
     overflow-wrap: anywhere;
+  }
+  .foundation-editor {
+    margin: 14px;
+    padding: 16px;
   }
   .foundation-editor label {
     min-width: 100%;

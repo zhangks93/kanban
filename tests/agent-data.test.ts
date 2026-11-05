@@ -77,6 +77,48 @@ test('agent discovery and reads are restricted to the granted workspace and curr
   ).toBe(401);
 });
 
+test('exact operation discovery and recovery details are useful without echoing invalid data', async () => {
+  const schema = await app.inject({ url: `${base}/schema/tasks.update`, headers: readonly });
+  expect(schema.statusCode).toBe(200);
+  expect(schema.json().operation).toMatchObject({
+    id: 'tasks.update',
+    method: 'PATCH',
+    scope: 'write',
+  });
+  expect(schema.json().operation.body.required).toEqual(['expectedVersion']);
+  expect(
+    (await app.inject({ url: `${base}/schema/unknown.operation`, headers: readonly })).statusCode,
+  ).toBe(404);
+  expect((await app.inject(`${base}/schema/tasks.update`)).statusCode).toBe(401);
+
+  const secretLikeValue = 'untrusted-input-that-must-not-be-echoed';
+  const invalid = await app.inject({
+    method: 'POST',
+    url: `${base}/boards/${alphaBoard}/tasks`,
+    headers: writable,
+    payload: {
+      title: 'invalid enum',
+      responsibleUserId: ids.a,
+      clientMutationId: crypto.randomUUID(),
+      priority: secretLikeValue,
+    },
+  });
+  expect(invalid.statusCode).toBe(422);
+  expect(invalid.json().error.detail).toMatchObject({
+    issues: [{ path: ['priority'], code: 'invalid_enum_value' }],
+    recovery: { action: 'inspect_exact_operation_schema', retryable: false },
+  });
+  expect(invalid.body).not.toContain(secretLikeValue);
+  const malformed = await app.inject({
+    method: 'POST',
+    url: `${base}/boards/${alphaBoard}/tasks`,
+    headers: { ...writable, 'content-type': 'application/json' },
+    payload: '{bad',
+  });
+  expect(malformed.statusCode).toBe(422);
+  expect(malformed.json().error.code).toBe('VALIDATION_FAILED');
+});
+
 test('read grants cannot mutate, write requests require strict bodies and versions', async () => {
   const taskId = '50000000-0000-4000-8000-000000000001';
   for (const method of ['PATCH', 'DELETE'] as const)

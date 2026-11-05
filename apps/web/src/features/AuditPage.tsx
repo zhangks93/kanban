@@ -2,6 +2,7 @@ import { format } from 'date-fns';
 import { useQuery } from '@tanstack/react-query';
 import { useApp } from '../lib/context';
 import { api } from '../api/client';
+import { PageHeader, EmptyState } from '../components/PageLayout';
 export function AuditPage() {
   const { workspace } = useApp();
   const audit = useQuery({
@@ -22,10 +23,21 @@ export function AuditPage() {
   });
   return (
     <>
-      <header className="page-heading">
-        <h1>审计记录</h1>
-      </header>
+      <PageHeader
+        title="审计记录"
+        eyebrow="空间管理"
+        description="追溯成员与 Agent 的操作，保留授权来源和请求标识。"
+        actions={
+          <button onClick={() => void audit.refetch()} disabled={audit.isFetching}>
+            刷新
+          </button>
+        }
+      />
       <div className="my-list">
+        {audit.isPending && <EmptyState title="正在加载记录…" tone="loading" />}
+        {audit.data?.length === 0 && (
+          <EmptyState title="暂无审计记录" description="空间中的关键变更会在这里保留记录。" />
+        )}
         {audit.data?.map((r) => (
           <div className="audit-row" key={r.id}>
             <span className="mono muted">

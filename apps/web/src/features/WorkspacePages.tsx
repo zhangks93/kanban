@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, ArrowRight } from 'lucide-react';
+import { Plus, ArrowRight, Layers, Users } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { api, post } from '../api/client';
 import { useApp } from '../lib/context';
 import { Modal } from '../components/ui';
+import { EmptyState, PageHeader, PageSection } from '../components/PageLayout';
 import type { Workspace } from '@work/shared';
 export function WorkspaceList() {
   const { workspaces, me, notify } = useApp();
@@ -16,36 +17,51 @@ export function WorkspaceList() {
   } = useForm<{ name: string; key: string }>();
   const qc = useQueryClient();
   return (
-    <>
-      <header className="page-heading">
-        <div>
-          <h1>工作空间</h1>
+    <div className="page-layout workspace-directory-page">
+      <PageHeader
+        title="工作空间"
+        description="选择一个团队空间，查看看板、任务与协作进展。"
+        actions={
+          me.is_platform_admin && (
+            <button className="primary" onClick={() => setOpen(true)}>
+              <Plus size={16} />
+              新建工作空间
+            </button>
+          )
+        }
+      />
+      <PageSection
+        title="团队空间"
+        description="工作空间集中管理团队成员、工作看板与基础数据。"
+        actions={<span className="section-count">{workspaces.length} 个空间</span>}
+      >
+        <div className="workspace-list">
+          {workspaces.map((w) => (
+            <a href={`/workspaces/${w.key}/boards`} className="workspace-row" key={w.id}>
+              <span className="workspace-mark">{w.name.slice(0, 1)}</span>
+              <div className="entity-row-copy">
+                <strong>{w.name}</strong>
+                <p className="muted">{w.description || w.key}</p>
+              </div>
+              <span className="role-badge">
+                {w.role === 'owner' ? '所有者' : w.role === 'admin' ? '管理员' : '成员'}
+              </span>
+              <ArrowRight size={16} className="entity-row-arrow" aria-hidden="true" />
+            </a>
+          ))}
+          {!workspaces.length && (
+            <EmptyState
+              icon={<Layers size={22} />}
+              title="暂无可访问的工作空间"
+              description={
+                me.is_platform_admin
+                  ? '创建第一个工作空间，开始组织团队工作。'
+                  : '请联系管理员添加成员。'
+              }
+            />
+          )}
         </div>
-        {me.is_platform_admin && (
-          <button className="primary" onClick={() => setOpen(true)}>
-            <Plus size={16} />
-            新建工作空间
-          </button>
-        )}
-      </header>
-      <div className="workspace-list">
-        {workspaces.map((w) => (
-          <a href={`/workspaces/${w.key}/boards`} className="workspace-row" key={w.id}>
-            <span className="workspace-mark">{w.name.slice(0, 1)}</span>
-            <div>
-              <strong>{w.name}</strong>
-              <p className="muted">{w.description || w.key}</p>
-            </div>
-            <span className="muted">
-              {w.role === 'owner' ? '所有者' : w.role === 'admin' ? '管理员' : '成员'}
-            </span>
-            <ArrowRight size={16} />
-          </a>
-        ))}
-        {!workspaces.length && (
-          <div className="empty">暂无可访问的工作空间，请联系管理员添加成员。</div>
-        )}
-      </div>
+      </PageSection>
       <Modal title="新建工作空间" open={open} onOpenChange={setOpen}>
         <form
           onSubmit={handleSubmit(async (b) => {
@@ -79,7 +95,7 @@ export function WorkspaceList() {
           </div>
         </form>
       </Modal>
-    </>
+    </div>
   );
 }
 export function MemberSettings() {
@@ -87,6 +103,8 @@ export function MemberSettings() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [userId, setUserId] = useState('');
+  const [pendingId, setPendingId] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
   const rows = useQuery({
     queryKey: ['members', workspace?.id],
     queryFn: () =>
@@ -97,75 +115,131 @@ export function MemberSettings() {
   });
   const can = workspace?.role === 'owner' || workspace?.role === 'admin';
   async function change(id: string, role: string, status: string) {
+    setPendingId(id);
     try {
       await post(`/api/workspaces/${workspace!.id}/members/${id}`, { role, status }, 'PATCH');
       await qc.invalidateQueries();
     } catch (e) {
       notify((e as Error).message);
+    } finally {
+      setPendingId(null);
     }
   }
   return (
-    <>
-      <header className="page-heading">
-        <h1>空间成员</h1>
-        {can && (
-          <button onClick={() => setOpen(true)}>
-            <Plus size={16} />
-            添加成员
-          </button>
-        )}
-      </header>
-      {rows.isError ? (
-        <div className="empty error">成员加载失败</div>
-      ) : (
-        <div className="data-table">
-          <div className="table-head">
-            <span>成员</span>
-            <span>角色</span>
-            <span>成员状态</span>
-          </div>
-          {rows.data?.map((u) => (
-            <div className="table-row" key={u.id}>
-              <span>
-                {u.display_name}
-                <small className="muted">
-                  {u.account_status === 'deactivated' ? ' · 账号已停用' : ''}
-                </small>
-              </span>
-              <select
-                aria-label={`${u.display_name}角色`}
-                value={u.role}
-                disabled={!can || (u.role === 'owner' && workspace?.role !== 'owner')}
-                onChange={(e) => void change(u.id, e.target.value, u.status)}
-              >
-                {['owner', 'admin', 'member'].map((r) => (
-                  <option key={r} value={r}>
-                    {{ owner: '所有者', admin: '管理员', member: '成员' }[r]}
-                  </option>
+    <div className="page-layout member-settings-page">
+      <PageHeader
+        title="空间成员"
+        description={`管理${workspace ? `「${workspace.name}」` : '当前工作空间'}的协作成员和访问权限。`}
+        actions={
+          can && (
+            <button className="primary" onClick={() => setOpen(true)}>
+              <Plus size={16} />
+              添加成员
+            </button>
+          )
+        }
+      />
+      <PageSection
+        title="成员与权限"
+        description="所有者与管理员可以管理成员，所有者角色由空间所有者维护。"
+        actions={rows.data && <span className="section-count">{rows.data.length} 位成员</span>}
+      >
+        {rows.isLoading ? (
+          <EmptyState title="正在加载成员…" tone="loading" />
+        ) : rows.isError ? (
+          <EmptyState
+            title="成员加载失败"
+            tone="error"
+            action={<button onClick={() => void rows.refetch()}>重试</button>}
+          />
+        ) : !rows.data?.length ? (
+          <EmptyState
+            title="暂无成员"
+            description="添加成员后即可共同管理工作。"
+            icon={<Users size={22} />}
+          />
+        ) : (
+          <div className="table-scroll">
+            <table className="management-table">
+              <thead>
+                <tr>
+                  <th>成员</th>
+                  <th>角色</th>
+                  <th>成员状态</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.data.map((u) => (
+                  <tr key={u.id}>
+                    <td>
+                      <div className="member-person">
+                        <span className="member-avatar" aria-hidden="true">
+                          {u.display_name.slice(0, 1)}
+                        </span>
+                        <div className="member-person-copy">
+                          <strong>{u.display_name}</strong>
+                          <small className="muted">
+                            {u.account_status === 'deactivated' ? '账号已停用' : '账号正常'}
+                          </small>
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      <select
+                        aria-label={`${u.display_name}角色`}
+                        value={u.role}
+                        disabled={
+                          pendingId !== null ||
+                          !can ||
+                          (u.role === 'owner' && workspace?.role !== 'owner')
+                        }
+                        onChange={(e) => void change(u.id, e.target.value, u.status)}
+                      >
+                        {['owner', 'admin', 'member'].map((r) => (
+                          <option key={r} value={r}>
+                            {{ owner: '所有者', admin: '管理员', member: '成员' }[r]}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td>
+                      <span
+                        className={`status-badge ${u.status === 'active' ? 'is-active' : 'is-muted'}`}
+                      >
+                        {u.status === 'active' ? '有效成员' : '已移出'}
+                      </span>
+                    </td>
+                    <td>
+                      <button
+                        disabled={pendingId !== null || !can}
+                        onClick={() =>
+                          void change(u.id, u.role, u.status === 'active' ? 'inactive' : 'active')
+                        }
+                      >
+                        {u.status === 'active' ? '移出空间' : '恢复成员'}
+                      </button>
+                    </td>
+                  </tr>
                 ))}
-              </select>
-              <button
-                disabled={!can}
-                onClick={() =>
-                  void change(u.id, u.role, u.status === 'active' ? 'inactive' : 'active')
-                }
-              >
-                {u.status === 'active' ? '移出空间' : '恢复成员'}
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </PageSection>
       <Modal title="添加空间成员" open={open} onOpenChange={setOpen}>
         <form
           onSubmit={async (e) => {
             e.preventDefault();
+            setAdding(true);
             try {
               await post(`/api/workspaces/${workspace!.id}/members`, { userId, role: 'member' });
               await qc.invalidateQueries();
               setOpen(false);
             } catch (err) {
               notify((err as Error).message);
+            } finally {
+              setAdding(false);
             }
           }}
         >
@@ -173,10 +247,18 @@ export function MemberSettings() {
             已登录用户 ID
             <input value={userId} onChange={(e) => setUserId(e.target.value)} required />
           </label>
-          <button className="primary">添加</button>
+          <p className="muted form-hint">成员需先通过飞书登录平台，再使用其用户 ID 添加。</p>
+          <div className="dialog-actions">
+            <button type="button" onClick={() => setOpen(false)}>
+              取消
+            </button>
+            <button className="primary" disabled={adding}>
+              添加
+            </button>
+          </div>
         </form>
       </Modal>
-    </>
+    </div>
   );
 }
 export function AdminUsers() {
@@ -198,41 +280,82 @@ export function AdminUsers() {
     }
   }
   return (
-    <>
-      <header className="page-heading">
-        <h1>平台用户</h1>
-      </header>
-      <div className="data-table">
-        <div className="table-head">
-          <span>用户</span>
-          <span>全局 WIP 上限</span>
-          <span>账号状态</span>
-        </div>
-        {users.data?.map((u) => (
-          <div className="table-row" key={u.id}>
-            <span>{u.display_name}</span>
-            <select
-              value={u.wip_limit}
-              aria-label={`${u.display_name}WIP上限`}
-              onChange={(e) => void change(u.id, 'wip-limit', { wipLimit: Number(e.target.value) })}
-            >
-              {Array.from({ length: 10 }, (_, i) => (
-                <option key={i + 1}>{i + 1}</option>
-              ))}
-            </select>
-            <button
-              onClick={() =>
-                void change(u.id, 'status', {
-                  status: u.status === 'active' ? 'deactivated' : 'active',
-                })
-              }
-            >
-              {u.status === 'active' ? '停用账号' : '恢复账号'}
-            </button>
+    <div className="page-layout admin-users-page">
+      <PageHeader
+        title="平台用户"
+        description="管理平台账号与个人工作容量，保持团队投入清晰可控。"
+      />
+      <PageSection
+        title="用户管理"
+        description="WIP 上限用于控制每位用户同时点亮的任务数量。"
+        actions={users.data && <span className="section-count">{users.data.length} 位用户</span>}
+      >
+        {users.isLoading ? (
+          <EmptyState title="正在加载用户…" tone="loading" />
+        ) : users.isError ? (
+          <EmptyState title="无权访问用户管理" tone="error" />
+        ) : !users.data?.length ? (
+          <EmptyState title="暂无平台用户" icon={<Users size={22} />} />
+        ) : (
+          <div className="table-scroll">
+            <table className="management-table">
+              <thead>
+                <tr>
+                  <th>用户</th>
+                  <th>全局 WIP 上限</th>
+                  <th>账号状态</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                {users.data.map((u) => (
+                  <tr key={u.id}>
+                    <td>
+                      <div className="member-person">
+                        <span className="member-avatar" aria-hidden="true">
+                          {u.display_name.slice(0, 1)}
+                        </span>
+                        <strong>{u.display_name}</strong>
+                      </div>
+                    </td>
+                    <td>
+                      <select
+                        value={u.wip_limit}
+                        aria-label={`${u.display_name}WIP上限`}
+                        onChange={(e) =>
+                          void change(u.id, 'wip-limit', { wipLimit: Number(e.target.value) })
+                        }
+                      >
+                        {Array.from({ length: 10 }, (_, i) => (
+                          <option key={i + 1}>{i + 1}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td>
+                      <span
+                        className={`status-badge ${u.status === 'active' ? 'is-active' : 'is-muted'}`}
+                      >
+                        {u.status === 'active' ? '正常' : '已停用'}
+                      </span>
+                    </td>
+                    <td>
+                      <button
+                        onClick={() =>
+                          void change(u.id, 'status', {
+                            status: u.status === 'active' ? 'deactivated' : 'active',
+                          })
+                        }
+                      >
+                        {u.status === 'active' ? '停用账号' : '恢复账号'}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        ))}
-      </div>
-      {users.isError && <p className="error">无权访问用户管理</p>}
-    </>
+        )}
+      </PageSection>
+    </div>
   );
 }

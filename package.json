@@ -18,7 +18,7 @@
     "format": "prettier --write .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:unit": "vitest run tests/dev-config.test.ts tests/task-queue.test.ts tests/agent-cli.test.ts",
+    "test:unit": "vitest run tests/dev-config.test.ts tests/task-queue.test.ts tests/agent-cli.test.ts tests/ui-design.test.ts",
     "test:db": "tsx scripts/db-test.ts",
     "test:e2e": "playwright test",
     "check:secrets": "tsx scripts/check-secrets.ts",

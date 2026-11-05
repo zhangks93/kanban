@@ -9,6 +9,15 @@ export interface Credentials {
   accessToken: string;
   expiresAt: string;
 }
+export interface PendingAuthorization {
+  server: string;
+  deviceCode: string;
+  userCode: string;
+  verificationUri: string;
+  expiresAt: string;
+  interval: number;
+  scopes: string[];
+}
 export type Environment = Record<string, string | undefined>;
 
 export function normalizeServer(value: string): string {
@@ -83,8 +92,7 @@ export async function readCredentials(env: Environment): Promise<Credentials | u
   }
 }
 
-export async function saveCredentials(env: Environment, credentials: Credentials) {
-  const file = configFile(env);
+async function saveSecret(file: string, data: unknown) {
   const directory = dirname(file);
   const temporary = join(directory, `.credentials-${randomUUID()}.tmp`);
   try {
@@ -93,13 +101,71 @@ export async function saveCredentials(env: Environment, credentials: Credentials
     if (!stat.isDirectory() || stat.isSymbolicLink())
       throw new CliError('CONFIG_ERROR', 'Credential directory must be a regular directory', 6);
     await chmod(directory, 0o700);
-    await writeFile(temporary, JSON.stringify(credentials) + '\n', { mode: 0o600, flag: 'wx' });
+    await writeFile(temporary, JSON.stringify(data) + '\n', { mode: 0o600, flag: 'wx' });
     await rename(temporary, file);
     await chmod(file, 0o600);
   } catch {
     throw new CliError('CONFIG_ERROR', 'Unable to securely save credentials', 6);
   } finally {
     await unlink(temporary).catch(() => undefined);
+  }
+}
+
+export async function saveCredentials(env: Environment, credentials: Credentials) {
+  await saveSecret(configFile(env), credentials);
+}
+
+export const pendingFile = (env: Environment) => join(dirname(configFile(env)), 'pending.json');
+export async function savePending(env: Environment, pending: PendingAuthorization) {
+  await saveSecret(pendingFile(env), pending);
+}
+export async function readPending(env: Environment): Promise<PendingAuthorization | undefined> {
+  try {
+    const file = pendingFile(env);
+    const stat = await lstat(file);
+    if (
+      !stat.isFile() ||
+      stat.isSymbolicLink() ||
+      (process.platform !== 'win32' && (stat.mode & 0o077) !== 0)
+    )
+      throw new CliError(
+        'CONFIG_ERROR',
+        'Pending authorization must be a regular file with mode 600',
+        6,
+      );
+    const data = JSON.parse(await readFile(file, 'utf8')) as Partial<PendingAuthorization>;
+    if (
+      typeof data.server !== 'string' ||
+      typeof data.deviceCode !== 'string' ||
+      !data.deviceCode ||
+      typeof data.userCode !== 'string' ||
+      typeof data.verificationUri !== 'string' ||
+      typeof data.expiresAt !== 'string' ||
+      !Number.isFinite(Date.parse(data.expiresAt)) ||
+      typeof data.interval !== 'number' ||
+      data.interval < 1 ||
+      data.interval > 60 ||
+      !Array.isArray(data.scopes) ||
+      data.scopes.some((scope) => scope !== 'read' && scope !== 'write')
+    )
+      throw new CliError('CONFIG_ERROR', 'Invalid pending authorization; start login again', 6);
+    const server = normalizeServer(data.server);
+    const verification = new URL(data.verificationUri);
+    if (verification.origin !== server || verification.username || verification.password)
+      throw new CliError('CONFIG_ERROR', 'Invalid pending authorization origin', 6);
+    return { ...data, server } as PendingAuthorization;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
+    if (error instanceof CliError) throw error;
+    throw new CliError('CONFIG_ERROR', 'Unable to read pending authorization', 6);
+  }
+}
+export async function clearPending(env: Environment) {
+  try {
+    await unlink(pendingFile(env));
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT')
+      throw new CliError('CONFIG_ERROR', 'Unable to clear pending authorization', 6);
   }
 }
 

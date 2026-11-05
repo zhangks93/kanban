@@ -34,9 +34,26 @@ pnpm work boards list
 pnpm work tasks list --limit 50
 ```
 
+Agent 可以先离线发现能力，按需读取单项 schema 与内置技能，再检查权限和执行操作：
+
+```bash
+pnpm work commands --json
+pnpm work schema tasks.update
+pnpm work skills list
+pnpm work skills read work-tasks
+pnpm work auth check --scope read
+pnpm work tasks +mine --page-all --page-limit 10 --fields id,title,version,state_group --format ndjson
+```
+
+需要将授权链接及时展示给用户时，使用 `auth login --no-wait`，由人确认后执行 `auth complete`。CLI 支持 JSON、NDJSON 与表格读取输出，并明确返回分页是否完整；服务端和 CLI 使用同一份操作契约。这些交互借鉴了官方 [lark-cli](https://github.com/larksuite/cli) 的能力发现与分层 skill 设计，继续沿用本系统的飞书用户委托和权限边界。
+
 默认只读；需要维护任务时，登录命令增加 `--write`，并由人在浏览器明确允许。授权默认 1 小时、最长 12 小时，不自动续期。Web 的“Agent 访问”页面提供授权管理。更新和删除要求任务版本，创建要求稳定的 `clientMutationId`，列表提供有界分页。
 
 使用 `pnpm build:cli` 生成独立 CLI，并将 [work-platform skill](skills/work-platform/SKILL.md) 安装到 Agent 的技能目录。完整命令、授权流程和权限边界见 [Agent 接入文档](docs/agent-access.md)。
+
+### 界面与模块
+
+工作台按照个人工作、空间协作、管理、集成与访问组织导航，使用统一的页头、内容分区、统计卡片与状态反馈。应用 Shell、导航配置、业务页面和领域样式独立维护。字号统一为 **12、13、14、18、24px 五级**，通过字重、色彩和间距补充信息层级；桌面与移动抽屉共用导航配置。组件和样式归属见 [界面规范](docs/design-system.md)。
 
 ### Task 预估与工时
 

@@ -1,0 +1,241 @@
+/* Shared page composition: heading, sections, summaries and feedback. */
+.page-layout {
+  display: grid;
+  gap: 24px;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 28px 32px 40px;
+}
+.page-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 28px 32px 24px;
+  border-bottom: 1px solid var(--border);
+}
+.page-layout > .page-heading {
+  padding: 0;
+  border: 0;
+}
+.page-header-copy {
+  min-width: 0;
+}
+.eyebrow {
+  display: block;
+  margin-bottom: 8px;
+  font-size: var(--font-xs);
+}
+.page-header-eyebrow {
+  color: var(--accent);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.page-heading p {
+  max-width: 720px;
+  margin: 8px 0 0;
+  font-size: var(--font-md);
+}
+.page-header-actions,
+.page-section-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.page-heading button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.page-section {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  background: var(--panel);
+  box-shadow: var(--shadow-sm);
+}
+.page-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border);
+}
+.page-section-copy {
+  min-width: 0;
+}
+.page-section-heading h2 {
+  margin: 0;
+}
+.page-section-description {
+  max-width: 760px;
+  margin: 6px 0 0;
+  font-size: var(--font-sm);
+}
+.page-section-body {
+  min-width: 0;
+  padding: 20px 24px;
+}
+.stat-grid,
+.page-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+.stat-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  padding: 20px 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  background: var(--panel);
+  box-shadow: var(--shadow-sm);
+}
+.stat-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  color: var(--muted);
+  font-size: var(--font-sm);
+}
+.stat-icon {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.stat-value {
+  overflow-wrap: anywhere;
+  font-size: var(--font-xl);
+  font-weight: 650;
+  letter-spacing: -0.025em;
+  line-height: 1.25;
+  font-variant-numeric: tabular-nums;
+}
+.stat-detail {
+  font-size: var(--font-xs);
+}
+.page-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 220px;
+  padding: 40px 24px;
+}
+.page-empty-icon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  color: var(--accent);
+  background: var(--surface);
+}
+.page-empty-title {
+  color: var(--text);
+  font-size: var(--font-md);
+  font-weight: 600;
+}
+.page-empty-description {
+  max-width: 420px;
+  margin: 0;
+  font-size: var(--font-sm);
+}
+.page-empty-action {
+  margin-top: 8px;
+}
+.page-empty.is-error .page-empty-title {
+  color: var(--danger);
+}
+.section-count {
+  white-space: nowrap;
+  padding: 3px 8px;
+  border-radius: 5px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: var(--font-xs);
+}
+.form-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--font-xs);
+  line-height: 1.6;
+}
+@media (max-width: 1100px) {
+  .stat-grid,
+  .page-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 900px) {
+  .page-layout {
+    padding: 24px 20px 32px;
+    gap: 20px;
+  }
+  .page-heading {
+    padding: 24px 20px;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+  .page-header-actions {
+    flex-wrap: wrap;
+  }
+  .page-section-heading {
+    padding: 18px 20px;
+  }
+  .page-section-body {
+    padding: 18px 20px;
+  }
+}
+@media (max-width: 640px) {
+  .page-layout {
+    padding: 20px 14px 28px;
+    gap: 16px;
+  }
+  .page-heading {
+    padding: 20px 14px;
+    gap: 16px;
+  }
+  .page-header-actions {
+    max-width: 100%;
+  }
+  .page-section-heading {
+    padding: 16px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .page-section-body {
+    padding: 16px;
+  }
+  .stat-grid,
+  .page-summary-grid {
+    gap: 12px;
+  }
+  .stat-card {
+    padding: 16px;
+    gap: 10px;
+  }
+  .stat-label {
+    gap: 6px;
+  }
+  .stat-icon {
+    display: none;
+  }
+  .page-empty {
+    min-height: 200px;
+    padding: 32px 12px;
+  }
+}

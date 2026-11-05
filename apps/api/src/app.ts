@@ -20,6 +20,7 @@ import { pool } from './lib/db';
 import { AppError, databaseCode } from './lib/errors';
 import { errorStatus, messages } from '@work/shared';
 import { ZodError } from 'zod';
+import { agentRecovery } from '@work/shared/agent';
 export async function buildApp(plugins = installedPlugins) {
   const registry = buildRegistry(plugins);
   const app = Fastify({
@@ -42,18 +43,42 @@ export async function buildApp(plugins = installedPlugins) {
     return payload;
   });
   app.setErrorHandler((e, req, reply) => {
+    const isAgent = req.url.startsWith('/api/agent/');
     const code =
       e instanceof AppError
         ? e.code
         : e instanceof ZodError
           ? 'VALIDATION_FAILED'
-          : databaseCode(e);
+          : isAgent &&
+              e instanceof Error &&
+              'code' in e &&
+              e.code === 'FST_ERR_CTP_INVALID_JSON_BODY'
+            ? 'VALIDATION_FAILED'
+            : databaseCode(e);
+    const recovery =
+      code && isAgent ? agentRecovery[code as keyof typeof agentRecovery] : undefined;
+    const detail = isAgent
+      ? {
+          ...(e instanceof AppError && e.detail !== undefined ? { context: e.detail } : {}),
+          ...(e instanceof ZodError
+            ? {
+                issues: e.issues.map((issue) => ({
+                  path: issue.path,
+                  code: issue.code,
+                })),
+              }
+            : {}),
+          ...(recovery ? { recovery } : {}),
+        }
+      : e instanceof AppError
+        ? e.detail
+        : undefined;
     if (code)
       return reply.status(errorStatus[code]).send({
         error: {
           code,
           message: messages[code],
-          detail: e instanceof AppError ? e.detail : undefined,
+          detail,
           requestId: req.id,
         },
       });

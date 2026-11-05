@@ -13,6 +13,9 @@
   "files": [
     "dist"
   ],
+  "dependencies": {
+    "@work/shared": "workspace:*"
+  },
   "scripts": {
     "dev": "tsx src/index.ts",
     "build": "node build.mjs",

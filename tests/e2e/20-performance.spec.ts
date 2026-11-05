@@ -33,7 +33,9 @@ test('1000-card Board virtualizes cells and remains interactive', async ({ page 
     await page.waitForURL('**/my');
     await page.goto('/workspaces/alpha/boards/PERF');
     // Loading the full fixture can exceed the default 5s assertion window on CI.
-    await expect(page.getByText('1000 项', { exact: true })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByTestId('board-task-count')).toHaveText('1000 项任务', {
+      timeout: 15000,
+    });
     await expect(page.getByRole('button', { name: '虚拟化任务 1', exact: true })).toBeVisible();
     expect(await page.locator('.task-card').count()).toBeLessThan(40);
     await page
