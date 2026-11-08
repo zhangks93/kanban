@@ -5,7 +5,11 @@ async function scan(dir: string): Promise<void> {
     if (f.isDirectory()) await scan(path);
     else if (/\.(js|html|css|map)$/.test(path)) {
       const text = await readFile(path, 'utf8');
-      if (/SUPABASE_DB_URL|FEISHU_APP_SECRET|APP_SESSION_SECRET|postgres:\/\//.test(text))
+      if (
+        /DATABASE_URL|DATABASE_CA_CERT_FILE|SUPABASE_DB_URL|FEISHU_APP_SECRET|APP_SESSION_SECRET|postgres(?:ql)?:\/\//.test(
+          text,
+        )
+      )
         throw Error(`Secret reference in ${path}`);
     }
   }

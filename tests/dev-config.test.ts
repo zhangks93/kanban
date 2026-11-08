@@ -4,8 +4,10 @@ import { spawnSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { afterEach, expect, test } from 'vitest';
 import { parse } from 'dotenv';
+import pg from 'pg';
 import { prepareLocalEnv } from '../scripts/local-env';
 import { validateEnvironment } from '../apps/api/src/lib/env';
+import { getDatabasePoolConfig, getDatabaseUrl } from '../apps/api/src/lib/database-config';
 
 const directories: string[] = [];
 afterEach(async () => {
@@ -18,7 +20,7 @@ async function fixture() {
   directories.push(root);
   await writeFile(
     resolve(root, '.env.example'),
-    'SUPABASE_DB_URL=\nFEISHU_APP_ID=\nFEISHU_APP_SECRET=\nAPP_SESSION_SECRET=\n',
+    'DATABASE_URL=\nFEISHU_APP_ID=\nFEISHU_APP_SECRET=\nAPP_SESSION_SECRET=\n',
   );
   return root;
 }
@@ -67,11 +69,54 @@ test('setup preserves a provided secret and refuses to edit production configura
 });
 test('missing service configuration reports all missing names without leaking values', () => {
   expect(() => validateEnvironment({ APP_SESSION_SECRET: valid().APP_SESSION_SECRET })).toThrow(
-    /SUPABASE_DB_URL[\s\S]*FEISHU_APP_ID[\s\S]*FEISHU_APP_SECRET/,
+    /DATABASE_URL[\s\S]*FEISHU_APP_ID[\s\S]*FEISHU_APP_SECRET/,
   );
   expect(() =>
     validateEnvironment({ ...valid(), SUPABASE_DB_URL: 'https://secret:password@db.example.test' }),
   ).toThrow('有效的 PostgreSQL');
+});
+test('CloudBase database URL takes precedence and blank values allow legacy rollback', () => {
+  const legacy = valid().SUPABASE_DB_URL;
+  const target = 'postgresql://work:encoded%23password@cloudbase.example.test:5432/work';
+  expect(getDatabaseUrl({ DATABASE_URL: ` ${target} `, SUPABASE_DB_URL: legacy })).toBe(target);
+  expect(getDatabaseUrl({ DATABASE_URL: '  ', SUPABASE_DB_URL: ` ${legacy} ` })).toBe(legacy);
+  expect(() => validateEnvironment({ ...valid(), DATABASE_URL: target })).not.toThrow();
+  expect(() =>
+    getDatabaseUrl({ DATABASE_URL: 'https://private-password@invalid', SUPABASE_DB_URL: legacy }),
+  ).toThrow('有效的 PostgreSQL');
+  expect(() => getDatabaseUrl({ DATABASE_URL: 'https://private-password@invalid' })).not.toThrow(
+    'private-password',
+  );
+});
+test('explicit CA reaches the pg driver with certificate verification despite URL SSL flags', async () => {
+  const root = await fixture();
+  const path = resolve(root, 'database CA #1.pem');
+  const ca = 'test-only-ca-file-content';
+  await writeFile(path, ca);
+  const config = getDatabasePoolConfig({
+    DATABASE_URL:
+      'postgres://work:private-password@db.example.test/work?sslmode=no-verify&ssl=false',
+    DATABASE_CA_CERT_FILE: path,
+  });
+  // Inspect the driver's effective TLS options without connecting to a database.
+  const client = new pg.Client(config);
+  const parameters = Reflect.get(client, 'connectionParameters') as {
+    ssl: { ca: string; rejectUnauthorized?: boolean };
+  };
+  expect(parameters.ssl.ca).toBe(ca);
+  expect(parameters.ssl.rejectUnauthorized).not.toBe(false);
+});
+test('URL SSL configuration is retained when no custom CA is provided; CA errors redact values', () => {
+  const target = 'postgres://work:private-password@db.example.test/work?sslmode=verify-full';
+  expect(getDatabasePoolConfig({ DATABASE_URL: target }).connectionString).toBe(target);
+  const env = {
+    ...valid(),
+    DATABASE_URL: target,
+    DATABASE_CA_CERT_FILE: '/missing/private-path/ca.pem',
+  };
+  expect(() => validateEnvironment(env)).toThrow('DATABASE_CA_CERT_FILE');
+  expect(() => validateEnvironment(env)).not.toThrow('private-path');
+  expect(() => validateEnvironment(env)).not.toThrow('private-password');
 });
 test('session pooler works but transaction pooler is rejected before migrations', () => {
   expect(() =>
@@ -118,7 +163,8 @@ test('reset and seed refuse remote databases before opening a connection', () =>
       cwd: process.cwd(),
       env: {
         ...process.env,
-        SUPABASE_DB_URL: 'postgres://postgres:private-password@db.example.test/postgres',
+        DATABASE_URL: 'postgres://postgres:private-password@db.example.test/postgres',
+        SUPABASE_DB_URL: '',
       },
       encoding: 'utf8',
       timeout: 10000,

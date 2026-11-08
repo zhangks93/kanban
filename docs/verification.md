@@ -1,5 +1,17 @@
 # 验证记录
 
+## 2026-11-08：CloudBase 国内站数据库接入准备
+
+目标记录为 `final-pony-d7gnzgdj1b8ab4f99` / 上海 `ap-shanghai`。以下验证使用 Node.js 24、本机 PostgreSQL 17.11 / pgTAP 1.3.3 和 Linux Chromium，未连接目标 CloudBase 数据库。
+
+- ESLint、TypeScript、Web / API / CLI 构建、前端密钥引用扫描和生产 API 启动检查通过。
+- Vitest 全量 16 个文件、69 项测试通过；pgTAP 87 个断言通过。配置测试验证新连接串优先、旧配置回滚、真实 `pg.Client` 的 CA 验证配置及远端 reset / seed 拒绝。
+- Playwright 定向 11 项通过，覆盖任务事务、参与人、WIP、基础数据、桌面与手机工时、公开分享和 Agent 授权 / 拒绝；本轮未重复全量视觉和性能用例。
+- 模拟 CloudBase 的 `anon`、`authenticated`、`service_role` 默认授权及敏感列授权，确认精确业务对象撤权后无法直接读写或调用业务 RPC，私有 API 仍可用。
+- 本地备份恢复预演核对 41 张业务表的行数与逐行内容摘要、14 条迁移历史和 57 个业务触发器一致；恢复后重新撤权，并确认目标已有的模拟托管函数仍可用。
+
+原文 `docs.cloudbase.net/skill.md` 访问返回 403，已读取官方 GitHub 技能及 PostgreSQL 连接说明。当前运行环境的网络策略仍拦截国内管理端点，且尚未观察到目标数据库密钥注入；CloudBase 登录、实例规格 / VPC / TLS、远端数据迁移和生产切换仍待实际验证。
+
 ## 2026-11-04：人授权的 Agent 接入
 
 环境：Node.js 24、可丢弃的本机 Docker PostgreSQL 17 / pgTAP 1.3.3、Linux Chromium 151、模拟飞书。

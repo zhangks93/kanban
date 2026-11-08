@@ -1,14 +1,14 @@
 # 部署
 
-本地调试按 [README 快速开始](../README.md#快速开始) 执行 `pnpm setup` → 填写飞书与 Supabase 配置 → `pnpm dev`。本文件说明生产部署要求。
+本地调试按 [README 快速开始](../README.md#快速开始) 执行 `pnpm setup` → 填写飞书与 CloudBase 配置 → `pnpm dev`。本文件说明生产部署要求。
 
 ## 服务边界
 
-Web 只请求同源 `/api` 和 `/auth`。API 使用服务端数据库账号连接 Supabase Hosted PostgreSQL。不要使用 Supabase Auth、PostgREST 或浏览器 service role。
+Web 只请求同源 `/api` 和 `/auth`。API 使用服务端数据库账号，通过 `pg` TCP 连接 CloudBase 国内站独享 PostgreSQL。飞书 OAuth 与应用 Session 保持不变，数据库不向浏览器开放。
 
 构建：`pnpm install --frozen-lockfile && pnpm build`。Web 产物在 `apps/web/dist/`；API 产物是 `apps/api/dist/index.mjs`。API package 的 `start` 脚本也可启动 bundle。
 
-API 需要 `APP_BASE_URL`、至少 32 个随机字符的 `APP_SESSION_SECRET`、`SUPABASE_DB_URL`、`FEISHU_APP_ID`、`FEISHU_APP_SECRET`，以及首次引导需要的 `BOOTSTRAP_PLATFORM_ADMIN_FEISHU_ID`。`API_PORT` 默认 3001；`SENTRY_DSN` 可选。Web 只接受 `VITE_SENTRY_DSN`，其余环境配置不得添加 `VITE_` 前缀。
+API 需要 `APP_BASE_URL`、至少 32 个随机字符的 `APP_SESSION_SECRET`、`DATABASE_URL`、`FEISHU_APP_ID`、`FEISHU_APP_SECRET`，以及首次引导需要的 `BOOTSTRAP_PLATFORM_ADMIN_FEISHU_ID`。`API_PORT` 默认 3001；`SENTRY_DSN` 可选。Web 只接受 `VITE_SENTRY_DSN`，其余环境配置不得添加 `VITE_` 前缀。
 
 使用飞书应用的稳定 **open_id** 建立用户唯一索引。管理员引导变量也使用 open_id；已存在的目标用户会在下一次登录时被引导为管理员。普通登录或移除引导变量不会降权已有管理员。
 
@@ -20,15 +20,19 @@ API 需要 `APP_BASE_URL`、至少 32 个随机字符的 `APP_SESSION_SECRET`、
 
 ## 数据库
 
-先备份已有生产数据，再运行 `SUPABASE_DB_URL=... pnpm db:migrate`。数据库版本为 PostgreSQL 15+，需要 `pg_trgm`。迁移和平台 API 使用可创建扩展的数据库账号；生产账号权限可以进一步分离，但所有 Core transaction functions、trigger functions、sequences 与所需表的权限必须完整授权给 API 私有账号。
+迁移已有 Supabase 数据前执行 [CloudBase 迁移指南](cloudbase-migration.md)。仅修改连接串不会迁移已有数据；尚未完成目标环境、实例和网络验证时，不应把配置改动视作已完成线上切换。
 
-迁移显式撤销 PUBLIC、Supabase anon/authenticated 对业务表与 public functions 的访问。正式部署按需授权 API 私有角色，并设置 `search_path=public,extensions`。如果使用独立 migration 账号，给 API 角色授予业务表 DML、sequence usage 与业务函数 EXECUTE；不要给浏览器角色授权。
+本项目依赖 PostgreSQL 15+、`pgcrypto`、`pg_trgm`、PL/pgSQL、事务与会话级 advisory lock。先核查目标实例实际版本、扩展可用性和账号权限。CloudBase **共享 PostgreSQL 不提供 TCP 端点**；这套 `pg.Pool` 访问方式要求独享实例。不得在未确认费用和目标规格时自动创建或升级资源。
 
-连接应使用 Supabase 提供的正式连接地址与受信任 CA，启用完整证书验证；连接串可使用驱动支持的 `sslmode=verify-full`。不要关闭 TLS 验证。当前实现固定使用 `pg` connection pool，默认最大 20 个连接。
+API 应运行在数据库同地域、同 VPC 的计算环境，使用控制台实际提供的私网主机及端口，并设置相应安全组。VPC / 子网信息从数据库详情读取；本地机器需要已配置的 VPN 或其他可靠私网接入。EnvId 不是数据库地址，也不代表数据库已经具备公网连通性。
 
-`schema_migrations` 记录已应用文件。每个 SQL 文件在一个事务中执行，迁移过程使用会话级 advisory lock 避免重复启动时并发执行。使用 Direct connection 或 Session pooler（5432），不使用 Transaction pooler（6543）。API 连接显式设置 `search_path=public,extensions`，兼容 Supabase 将扩展安装在 `extensions` schema 的情况。
+把连接串保存在服务端 `DATABASE_URL`，按控制台要求启用 TLS 并验证服务器证书。自定义 CA 可挂载到安全路径并通过 `DATABASE_CA_CERT_FILE` 指定。不要关闭证书验证。`SUPABASE_DB_URL` 仅在 `DATABASE_URL` 为空时作为兼容值；回滚时必须更新或清除 `DATABASE_URL`，仅改旧变量不会改变目标库。
 
-`pnpm dev` 在启动前自动执行待应用迁移，不执行 reset 或 seed。`db:reset` / `db:seed` 仅接受回环地址，用于可重建的测试数据，不能用于 Hosted Supabase。
+备份并确认目标数据库后，先运行只读预检 `pnpm db:check`，再运行 `pnpm db:migrate`。预检不代替管理面核查目标完整 EnvId 和实例规格。迁移账号需要创建业务表、函数和扩展的权限；API 私有账号只授予所需表 DML、sequence usage 和业务函数 EXECUTE。业务数据授权仍由 API / SQL transaction functions 实施；不要给 CloudBase 网关角色 `anon`、`authenticated`、`service_role` 授予业务表及函数访问，迁移后检查并撤销意外授权。若用独立迁移账号，完整授权 API 账号后再部署。
+
+`supabase/migrations/` 保留历史目录名，内容是通用 PostgreSQL SQL；`public.schema_migrations` 记录已应用文件，迁移历史和业务数据一起迁入目标库。每个 SQL 文件在一个事务中执行，迁移过程使用会话级 advisory lock。直连或保持会话语义的连接池可用；旧 Supabase Transaction pooler（6543）不支持这套迁移方式。API 使用 `search_path=public,extensions`，兼容历史扩展安装位置；连接池默认最大 20 个连接，应结合目标实例容量与 API 副本数量安排连接预算。
+
+`pnpm dev` 在启动前自动执行待应用迁移，不执行 reset 或 seed。`db:reset` / `db:seed` 仅接受回环地址，用于可重建的测试数据，不能用于 CloudBase 等远端数据库。
 
 ## HTTPS 反向代理示例
 
@@ -53,4 +57,4 @@ API 进程由 systemd 或其他进程管理器托管。配置统一从仓库根�
 
 ## 外部联调
 
-真实 Feishu 应用、Hosted Supabase、Sentry、反向代理与远端 CI 均未在当前环境中连接。需要在目标环境验证 OAuth 回调白名单、open_id 管理员引导、数据库 TLS/角色授权、日志与监控。
+真实 Feishu 应用、目标 CloudBase 国内站数据库、Sentry、反向代理与远端 CI 需要在目标环境单独联调。需要在目标环境验证 OAuth 回调白名单、open_id 管理员引导、数据库 TLS/角色授权、日志与监控。

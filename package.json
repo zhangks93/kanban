@@ -24,6 +24,8 @@
     "check:secrets": "tsx scripts/check-secrets.ts",
     "db:reset": "tsx scripts/db.ts reset",
     "db:migrate": "tsx scripts/db.ts migrate",
+    "db:check": "tsx scripts/db-check.ts",
+    "db:permissions": "tsx scripts/db.ts permissions",
     "db:seed": "tsx scripts/db.ts seed",
     "fake:feishu": "tsx scripts/fake-feishu.ts",
     "build:api": "tsx scripts/build-api.ts",

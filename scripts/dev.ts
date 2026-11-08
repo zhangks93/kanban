@@ -6,7 +6,8 @@ const root = fileURLToPath(new URL('../', import.meta.url));
 process.chdir(root);
 try {
   const result = await prepareLocalEnv(root);
-  if (result.created) console.log('已创建 .env，请填写 Supabase 与飞书配置后重新运行 pnpm dev。');
+  if (result.created)
+    console.log('已创建 .env，请填写 CloudBase PostgreSQL 与飞书配置后重新运行 pnpm dev。');
   const { validateEnvironment } = await import('../apps/api/src/lib/env');
   validateEnvironment();
   if (!process.env.BOOTSTRAP_PLATFORM_ADMIN_FEISHU_ID)

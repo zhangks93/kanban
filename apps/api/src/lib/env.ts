@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { config } from 'dotenv';
+import { getDatabasePoolConfig } from './database-config';
 
 export function loadEnvironment() {
   let root = process.cwd();
@@ -16,20 +17,13 @@ export function loadEnvironment() {
 
 export function validateEnvironment(env: NodeJS.ProcessEnv = process.env) {
   const errors: string[] = [];
-  for (const key of ['SUPABASE_DB_URL', 'FEISHU_APP_ID', 'FEISHU_APP_SECRET']) {
-    if (!env[key]?.trim()) errors.push(`请配置 ${key}`);
+  try {
+    getDatabasePoolConfig(env);
+  } catch (error) {
+    errors.push(error instanceof Error ? error.message : '数据库配置无效');
   }
-  if (env.SUPABASE_DB_URL) {
-    try {
-      const url = new URL(env.SUPABASE_DB_URL);
-      if (!['postgres:', 'postgresql:'].includes(url.protocol) || !url.hostname) throw Error();
-      if (url.hostname.endsWith('.pooler.supabase.com') && url.port === '6543')
-        errors.push(
-          'SUPABASE_DB_URL 请使用 Direct connection 或 Session pooler（5432），以支持迁移',
-        );
-    } catch {
-      errors.push('SUPABASE_DB_URL 必须是有效的 PostgreSQL 连接串');
-    }
+  for (const key of ['FEISHU_APP_ID', 'FEISHU_APP_SECRET']) {
+    if (!env[key]?.trim()) errors.push(`请配置 ${key}`);
   }
   if (!env.APP_SESSION_SECRET || env.APP_SESSION_SECRET.length < 32)
     errors.push('APP_SESSION_SECRET 至少需要 32 个字符；本地开发可运行 pnpm setup 自动生成');
