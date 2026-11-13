@@ -7,20 +7,27 @@ process.chdir(root);
 try {
   const result = await prepareLocalEnv(root);
   if (result.created)
-    console.log('已创建 .env，请填写 CloudBase PostgreSQL 与飞书配置后重新运行 pnpm dev。');
+    console.log('已创建 .env，请填写 CloudBase、飞书与 Session 配置后重新运行 pnpm dev。');
   const { validateEnvironment } = await import('../apps/api/src/lib/env');
   validateEnvironment();
   if (!process.env.BOOTSTRAP_PLATFORM_ADMIN_FEISHU_ID)
     console.warn(
       '提示：首次使用请配置 BOOTSTRAP_PLATFORM_ADMIN_FEISHU_ID，管理员才能创建工作空间。',
     );
-  const { pool } = await import('../apps/api/src/lib/db');
-  try {
-    const { migrate } = await import('./migrations');
-    console.log('正在检查数据库并应用待执行的迁移…');
-    await migrate(pool);
-  } finally {
-    await pool.end();
+  const { getCloudBaseConfig } = await import('../apps/api/src/lib/cloudbase-config');
+  if (getCloudBaseConfig()) {
+    console.log(
+      'CloudBase 模式：保留飞书 OAuth 与 Session，启动 API 和 Web。云端 SQL 请单独初始化。',
+    );
+  } else {
+    const { pool } = await import('../apps/api/src/lib/db');
+    try {
+      const { migrate } = await import('./migrations');
+      console.log('正在检查数据库并应用待执行的迁移…');
+      await migrate(pool);
+    } finally {
+      await pool.end();
+    }
   }
   console.log(`\n本地工作台：${process.env.APP_BASE_URL}`);
   console.log(

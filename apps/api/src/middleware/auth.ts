@@ -5,6 +5,8 @@ import type { User } from '@work/shared';
 import { pool } from '../lib/db';
 import { AppError } from '../lib/errors';
 import { requestContext } from '../lib/request-context';
+import { getCloudBaseConfig } from '../lib/cloudbase-config';
+import { authStore } from '../lib/auth-store';
 export interface AgentAuthorization {
   id: string;
   userId: string;
@@ -46,6 +48,10 @@ function verified(value: string) {
   const actual = Buffer.from(value);
   return actual.length === expected.length && timingSafeEqual(actual, expected) ? token : null;
 }
+export function sessionHash(cookie: string | undefined) {
+  const token = cookie ? verified(cookie) : null;
+  return token ? hash(token) : null;
+}
 export const cookieOptions = {
   httpOnly: true,
   secure: process.env.NODE_ENV === 'production',
@@ -64,6 +70,7 @@ export async function registerAuthMiddleware(app: FastifyInstance) {
       // must never silently turn an unapproved CLI into an authenticated client.
       const match = /^Bearer ([A-Za-z0-9_-]{43})$/.exec(req.headers.authorization ?? '');
       if (!match) throw new AppError('UNAUTHENTICATED');
+      if (getCloudBaseConfig()) return; // The server-signed RPC checks the grant in CloudBase.
       const result = await pool.query(
         `SELECT u.*,wip_usage(u.id) AS used_wip,a.id AS agent_id,
          a.workspace_id AS agent_workspace_id,a.scopes AS agent_scopes,a.client_name AS agent_client_name
@@ -112,13 +119,11 @@ export async function registerAuthMiddleware(app: FastifyInstance) {
       (req.method === 'POST' && /^\/api\/public\/boards\/[^/]+\/submissions$/.test(path))
     )
       return;
-    const token = req.cookies.session ? verified(req.cookies.session) : null;
-    if (!token) throw new AppError('UNAUTHENTICATED');
-    const result = await pool.query(
-      "SELECT u.*,wip_usage(u.id) AS used_wip FROM auth_session s JOIN app_user u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>now() AND u.status='active'",
-      [hash(token)],
-    );
-    if (!result.rows[0]) throw new AppError('UNAUTHENTICATED');
-    req.actor = result.rows[0];
+    const digest = sessionHash(req.cookies.session);
+    if (!digest) throw new AppError('UNAUTHENTICATED');
+    if (getCloudBaseConfig() && path.startsWith('/api/')) return;
+    const user = await authStore.findSession(digest);
+    if (!user) throw new AppError('UNAUTHENTICATED');
+    req.actor = user;
   });
 }

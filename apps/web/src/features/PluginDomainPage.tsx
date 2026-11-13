@@ -3,6 +3,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { Plus } from 'lucide-react';
 import { useApp } from '../lib/context';
 import { api, post } from '../api/client';
+import { useWorkspacePlugins } from '../plugins/useWorkspacePlugins';
 import '../styles/foundation-data.css';
 
 type System = { id: string; name: string };
@@ -12,6 +13,31 @@ type DataKind = 'systems' | 'projects';
 type Editor = { id?: string; name: string; systemId: string };
 
 export function FoundationDataPage() {
+  const { workspace } = useApp();
+  const plugins = useWorkspacePlugins(workspace?.id);
+  if (!workspace) return <div className="empty">请选择工作空间</div>;
+  if (plugins.isPending)
+    return (
+      <div className="empty" role="status">
+        加载中…
+      </div>
+    );
+  if (plugins.isError)
+    return (
+      <div className="empty" role="alert">
+        加载失败 <button onClick={() => void plugins.refetch()}>重试</button>
+      </div>
+    );
+  if (!plugins.systems) return <div className="empty">当前工作空间未启用提供基础数据的插件。</div>;
+  return (
+    <FoundationDataContent
+      key={`${workspace.id}:${plugins.projects}`}
+      showProjects={plugins.projects}
+    />
+  );
+}
+
+function FoundationDataContent({ showProjects }: { showProjects: boolean }) {
   const { workspace, notify } = useApp();
   const qc = useQueryClient();
   const [kind, setKind] = useState<DataKind>('systems');
@@ -29,7 +55,7 @@ export function FoundationDataPage() {
     setSystemFilter('');
   }, [workspace?.id, kind]);
   const systems = data.data?.systems ?? [];
-  const projects = data.data?.projects ?? [];
+  const projects = showProjects ? (data.data?.projects ?? []) : [];
   const rows =
     kind === 'systems'
       ? systems
@@ -101,12 +127,14 @@ export function FoundationDataPage() {
             >
               系统 <span>{systems.length}</span>
             </button>
-            <button
-              aria-current={kind === 'projects' ? 'page' : undefined}
-              onClick={() => setKind('projects')}
-            >
-              项目 <span>{projects.length}</span>
-            </button>
+            {showProjects && (
+              <button
+                aria-current={kind === 'projects' ? 'page' : undefined}
+                onClick={() => setKind('projects')}
+              >
+                项目 <span>{projects.length}</span>
+              </button>
+            )}
           </nav>
           {kind === 'projects' && projects.length > 0 && (
             <select
@@ -185,7 +213,7 @@ export function FoundationDataPage() {
             <thead>
               <tr>
                 <th>{label}名称</th>
-                <th>{kind === 'systems' ? '关联项目' : '所属系统'}</th>
+                {showProjects && <th>{kind === 'systems' ? '关联项目' : '所属系统'}</th>}
                 {canManage && <th className="foundation-action-cell">操作</th>}
               </tr>
             </thead>
@@ -193,12 +221,14 @@ export function FoundationDataPage() {
               {rows.map((row) => (
                 <tr key={row.id}>
                   <td>{row.name}</td>
-                  <td className="muted">
-                    {kind === 'systems'
-                      ? projects.filter((project) => project.system_id === row.id).length
-                      : (systems.find((system) => system.id === (row as Project).system_id)?.name ??
-                        '—')}
-                  </td>
+                  {showProjects && (
+                    <td className="muted">
+                      {kind === 'systems'
+                        ? projects.filter((project) => project.system_id === row.id).length
+                        : (systems.find((system) => system.id === (row as Project).system_id)
+                            ?.name ?? '—')}
+                    </td>
+                  )}
                   {canManage && (
                     <td className="foundation-action-cell">
                       <button

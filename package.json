@@ -8,6 +8,9 @@
   },
   "scripts": {
     "setup": "tsx scripts/setup.ts",
+    "cloudbase:sql": "tsx scripts/cloudbase-prepare.ts",
+    "cloudbase:check": "tsx scripts/cloudbase-check.ts",
+    "test:cloudbase": "vitest run tests/cloudbase.test.ts tests/cloudbase-rpc.test.ts tests/cloudbase-client.test.ts tests/cloudbase-schema.test.ts tests/cloudbase-transport.test.ts",
     "dev": "tsx scripts/dev.ts",
     "dev:api": "pnpm --filter @work/api dev",
     "dev:web": "pnpm --filter @work/web dev",
@@ -18,7 +21,7 @@
     "format": "prettier --write .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:unit": "vitest run tests/dev-config.test.ts tests/task-queue.test.ts tests/agent-cli.test.ts",
+    "test:unit": "vitest run tests/dev-config.test.ts tests/cloudbase.test.ts tests/task-queue.test.ts tests/agent-cli.test.ts",
     "test:db": "tsx scripts/db-test.ts",
     "test:e2e": "playwright test",
     "check:secrets": "tsx scripts/check-secrets.ts",
@@ -48,6 +51,7 @@
     "typescript-eslint": "^8.50.0",
     "vitest": "^3.2.0",
     "pg": "^8.16.0",
-    "esbuild": "^0.28.2"
+    "esbuild": "^0.28.2",
+    "@electric-sql/pglite": "^0.5.15"
   }
 }

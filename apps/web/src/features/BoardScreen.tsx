@@ -1,6 +1,5 @@
 import { BoardManage } from './BoardManage';
 import { BoardShare } from './BoardShare';
-import { PluginLanePanel } from './PluginLanePanel';
 import { IntakePanel } from './IntakePanel';
 import { installedPlugins } from '../plugins/registry';
 
@@ -148,7 +147,7 @@ export function BoardScreen() {
       : requestedGroup === 'service'
         ? 'system'
         : requestedGroup;
-  const [grouping, setGrouping] = useState(
+  const [selectedGrouping, setGrouping] = useState(
     [
       'lane',
       'responsible',
@@ -163,11 +162,20 @@ export function BoardScreen() {
       ? initialGroup
       : 'lane',
   );
+  const grouping =
+    selectedGrouping === 'lane'
+      ? board?.plugin_key === 'rnd'
+        ? 'project'
+        : board?.plugin_key === 'ops'
+          ? 'system'
+          : 'lane'
+      : selectedGrouping;
   const [peek, setPeek] = useState<string | null>(null);
   const [create, setCreate] = useState<{
     state?: string;
     lane?: string | null;
     responsible?: string;
+    pluginFields?: Record<string, string | null>;
   } | null>(null);
   const [lanesOpen, setLanesOpen] = useState(false);
   const [intakeOpen, setIntakeOpen] = useState(false);
@@ -201,6 +209,10 @@ export function BoardScreen() {
       </div>
     );
   const d = data.data;
+  const canManageLanes =
+    !d.board.plugin_key &&
+    workspace?.id === d.board.workspace_id &&
+    ['owner', 'admin'].includes(workspace.role);
   const filtered = (tasks.data ?? []).filter(
     (t) =>
       (!filter.q || t.title.includes(filter.q)) &&
@@ -411,7 +423,7 @@ export function BoardScreen() {
             }}
           >
             {Object.entries({
-              lane: '泳道',
+              ...(!d.board.plugin_key ? { lane: '泳道' } : {}),
               responsible: '负责人',
               priority: '优先级',
               type: '类型',
@@ -448,7 +460,7 @@ export function BoardScreen() {
             {d.board.plugin_key === 'ops' ? '工单' : '需求'}
           </button>
         )}
-        {d.board.can_manage && d.board.lane_mode === 'manual' && (
+        {canManageLanes && (
           <button onClick={() => setLanesOpen(true)}>
             <Settings2 size={14} />
             泳道
@@ -507,6 +519,14 @@ export function BoardScreen() {
                         state: s.id,
                         lane: grouping === 'lane' && g.id !== 'null' ? g.id : null,
                         responsible: grouping === 'responsible' ? g.id : undefined,
+                        pluginFields:
+                          grouping === 'project' && g.id !== 'null'
+                            ? {
+                                project_id: g.id,
+                              }
+                            : grouping === 'system' && g.id !== 'null'
+                              ? { system_id: g.id }
+                              : undefined,
                       })
                     }
                   />
@@ -525,6 +545,7 @@ export function BoardScreen() {
           initialState={create.state}
           initialLane={create.lane}
           initialResponsible={create.responsible}
+          initialPluginFields={create.pluginFields}
         />
       )}
       <BoardManage data={d} open={manageOpen} onClose={() => setManageOpen(false)} />
@@ -532,7 +553,9 @@ export function BoardScreen() {
         <BoardShare boardId={d.board.id} open={shareOpen} onClose={() => setShareOpen(false)} />
       )}
       <IntakePanel data={d} open={intakeOpen} onClose={() => setIntakeOpen(false)} />
-      <LaneManager data={d} open={lanesOpen} onClose={() => setLanesOpen(false)} />
+      {lanesOpen && canManageLanes && (
+        <LaneManager key={d.board.id} data={d} open onClose={() => setLanesOpen(false)} />
+      )}
       {peek && <TaskDetail taskId={peek} data={d} onClose={() => setPeek(null)} />}
     </>
   );
@@ -546,18 +569,30 @@ function LaneManager({
   open: boolean;
   onClose: () => void;
 }) {
-  const { notify } = useApp();
+  const { workspace, notify } = useApp();
   const mutations = useTaskMutations();
   const [name, setName] = useState('');
+  const [busy, setBusy] = useState(false);
   const [rename, setRename] = useState<Record<string, string>>({});
+  const canManage =
+    !data.board.plugin_key &&
+    workspace?.id === data.board.workspace_id &&
+    ['owner', 'admin'].includes(workspace.role);
   async function save(path: string, body: unknown, method = 'POST') {
+    if (!canManage || busy) return false;
+    setBusy(true);
     try {
       await post(`/api/boards/${data.board.id}/lanes${path}`, body, method);
       await mutations.refresh();
+      return true;
     } catch (e) {
       notify((e as Error).message);
+      return false;
+    } finally {
+      setBusy(false);
     }
   }
+  if (!canManage) return null;
   return (
     <Modal title="管理泳道" open={open} onOpenChange={(v) => !v && onClose()}>
       <div className="lane-manager">
@@ -570,37 +605,44 @@ function LaneManager({
                   aria-label={`${l.name}名称`}
                   value={rename[l.id] ?? l.name}
                   onChange={(e) => setRename({ ...rename, [l.id]: e.target.value })}
+                  disabled={busy}
                 />
                 <button
+                  disabled={busy}
                   onClick={() => void save(`/${l.id}`, { name: rename[l.id] ?? l.name }, 'PATCH')}
                 >
                   保存
                 </button>
                 <button
+                  disabled={busy}
                   aria-label={`上移${l.name}`}
                   onClick={() => void save(`/${l.id}`, { sortOrder: i - 1 }, 'PATCH')}
                 >
                   ↑
                 </button>
-                <button onClick={() => void save(`/${l.id}/archive`, {})}>归档</button>
+                <button disabled={busy} onClick={() => void save(`/${l.id}/archive`, {})}>
+                  归档
+                </button>
               </div>
-              <PluginLanePanel data={data} lane={l} />
             </div>
           ))}
         <form
           onSubmit={async (e) => {
             e.preventDefault();
-            await save('', { name });
-            setName('');
+            if (await save('', { name })) {
+              setName('');
+            }
           }}
         >
           <input
             placeholder="新泳道名称"
             value={name}
             onChange={(e) => setName(e.target.value)}
+            disabled={busy}
+            maxLength={100}
             required
           />
-          <button>添加</button>
+          <button disabled={busy}>添加</button>
         </form>
       </div>
     </Modal>

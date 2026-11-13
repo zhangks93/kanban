@@ -1,19 +1,13 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { useApp } from '../lib/context';
-import { api, post } from '../api/client';
+import { post } from '../api/client';
+import { useWorkspacePlugins } from '../plugins/useWorkspacePlugins';
 import { useState } from 'react';
 export function PluginSettings() {
   const { workspace, me, notify } = useApp();
   const qc = useQueryClient();
   const [saving, setSaving] = useState('');
-  const plugins = useQuery({
-    queryKey: ['plugins', workspace?.id],
-    queryFn: () =>
-      api<{ key: string; name: string; enabled: boolean }[]>(
-        `/api/workspaces/${workspace!.id}/plugins`,
-      ),
-    enabled: !!workspace,
-  });
+  const plugins = useWorkspacePlugins(workspace?.id);
   const can = ['owner', 'admin'].includes(workspace?.role ?? '');
   return (
     <>
@@ -51,9 +45,11 @@ export function PluginSettings() {
           </div>
         ))}
       </div>
-      <p className="workspace-list">
-        <a href={`/workspaces/${workspace?.key}/data`}>管理基础数据</a>
-      </p>
+      {plugins.systems && (
+        <p className="workspace-list">
+          <a href={`/workspaces/${workspace?.key}/data`}>管理基础数据</a>
+        </p>
+      )}
       {me.is_platform_admin && (
         <div className="workspace-archive">
           <button

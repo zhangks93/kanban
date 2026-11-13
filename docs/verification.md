@@ -1,5 +1,21 @@
 # 验证记录
 
+## 2026-11-09：自定义 schema 下飞书重复登录失败
+
+- 真实回调诊断：`auth.login` 返回 HTTP 404 / `DATABASE_42P01`。在 PGlite 中使用 `project_management`、`anon` 与同一用户重复登录，复现 `relation "workspace_member" does not exist`。旧版认证分支提前返回，用户更新的延迟约束直到 RPC 的 schema 和执行角色恢复后才执行。
+- 修复认证分支，在返回前执行 `SET CONSTRAINTS ALL IMMEDIATE`。回归验证旧函数失败、补丁升级后成功、补丁重复执行、新安装后执行补丁、保留用户 ID / 管理员权限 / 工作空间 owner 角色 / 原有任务，以及失败事务不遗留 Session。CloudBase 隔离测试 33 项通过，类型检查与相关 ESLint 通过。
+- 为已初始化环境提供 `.cloudbase/patches/20261109-returning-login.sql`，仅更新 `work_platform.dispatch`。新安装 SQL 与补丁的健康版本均为 3；`pnpm cloudbase:check` 会拒绝把旧版健康响应当作已完成修复。
+- 现有 Key 调用管理员 SQL 接口返回 `DATABASE_PERMISSION_DENIED`；用户在 SQL 编辑器应用补丁后，远端 `pnpm cloudbase:check` 已通过，确认 `project_management` / `schemaVersion=3`、服务端签名与 OAuth state 创建和消费正常。完整真实飞书登录仍需从登录页重新发起验证。
+
+## 2026-11-08：飞书 OAuth / Session + CloudBase HTTPS RPC
+
+登录和身份验证继续走飞书，用户、角色、Session 和业务数据存储到 CloudBase PostgreSQL。前一轮误加的 CloudBase Auth 登录、浏览器直连与静态部署模式已移除。
+
+- 使用模拟飞书 HTTP 响应与 PGlite 验证实际 Fastify OAuth 回调、一次性 state、HttpOnly Cookie、重复登录保留用户 ID / 角色、账号停用、CSRF 与退出清理 CloudBase Session。
+- CloudBase 数据工作流使用服务端签名 RPC，验证签名篡改、过期、防重放、身份隔离、任务版本、WIP、工时、插件、公开分享及 Agent 授权与幂等写入。没有访问或修改旧远端数据库。
+- 隔离测试不能代替真实飞书应用、CloudBase 网关、并发连接和生产部署验证。远端仍需执行新生成的初始化 SQL，以配置服务端签名入口；该文件含私有签名配置，不公开发布。
+- 以下旧记录反映各自当时的测试环境与接入方式。
+
 ## 2026-11-08：CloudBase 国内站数据库接入准备
 
 目标记录为 `final-pony-d7gnzgdj1b8ab4f99` / 上海 `ap-shanghai`。以下验证使用 Node.js 24、本机 PostgreSQL 17.11 / pgTAP 1.3.3 和 Linux Chromium，未连接目标 CloudBase 数据库。

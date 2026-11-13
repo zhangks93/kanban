@@ -235,23 +235,14 @@ export async function registerBoards(
     const bid = uuid.parse((req.params as any).boardId);
     const b = z
       .object({
-        name: z.string().trim().min(1).max(100),
+        name: z.string().trim().min(1).max(100).optional(),
         key: z.string().min(1).max(50).optional(),
       })
       .parse(req.body);
-    return manageBoard(req.actor.id, bid, async (db) => {
-      if (
-        (await db.query('SELECT lane_mode FROM board WHERE id=$1', [bid])).rows[0].lane_mode !==
-        'manual'
-      )
-        throw new AppError('LANE_NOT_ALLOWED');
-      return (
-        await db.query(
-          'INSERT INTO board_lane(board_id,key,name,sort_order) VALUES($1,$2,$3,(SELECT coalesce(max(sort_order),0)+1 FROM board_lane WHERE board_id=$1)) RETURNING *',
-          [bid, b.key ?? crypto.randomUUID(), b.name],
-        )
-      ).rows[0];
-    });
+    return transaction(
+      req.actor.id,
+      async (db) => (await db.query('SELECT * FROM create_board_lane($1,$2)', [bid, b])).rows[0],
+    );
   });
   app.patch('/api/boards/:boardId/lanes/:laneId', async (req) => {
     const p = z.object({ boardId: uuid, laneId: uuid }).parse(req.params);
@@ -262,37 +253,21 @@ export async function registerBoards(
         sortOrder: z.number().int().optional(),
       })
       .parse(req.body);
-    return manageBoard(
+    return transaction(
       req.actor.id,
-      p.boardId,
       async (db) =>
-        (
-          await db.query(
-            'UPDATE board_lane SET name=coalesce($3,name),description=CASE WHEN $4 THEN $5 ELSE description END,sort_order=coalesce($6,sort_order) WHERE board_id=$1 AND id=$2 RETURNING *',
-            [p.boardId, p.laneId, b.name, 'description' in b, b.description, b.sortOrder],
-          )
-        ).rows[0],
+        (await db.query('SELECT * FROM mutate_board_lane($1,$2,$3)', [p.boardId, p.laneId, b]))
+          .rows[0],
     );
   });
   app.post('/api/boards/:boardId/lanes/:laneId/archive', async (req) => {
     const p = z.object({ boardId: uuid, laneId: uuid }).parse(req.params);
-    return manageBoard(req.actor.id, p.boardId, async (db) => {
-      const count = Number(
-        (
-          await db.query(
-            "SELECT count(*) FROM task WHERE lane_id=$1 AND deleted_at IS NULL AND state_group NOT IN('completed','cancelled')",
-            [p.laneId],
-          )
-        ).rows[0].count,
-      );
-      if (count) throw new AppError('LANE_HAS_ACTIVE_TASKS', { activeTaskCount: count });
-      return (
-        await db.query(
-          "UPDATE board_lane SET status='archived' WHERE id=$1 AND board_id=$2 RETURNING *",
-          [p.laneId, p.boardId],
-        )
-      ).rows[0];
-    });
+    return transaction(
+      req.actor.id,
+      async (db) =>
+        (await db.query("SELECT * FROM mutate_board_lane($1,$2,'{}',true)", [p.boardId, p.laneId]))
+          .rows[0],
+    );
   });
   for (const table of ['label', 'milestone'] as const) {
     app.post(`/api/boards/:boardId/${table === 'label' ? 'labels' : 'milestones'}`, async (req) => {

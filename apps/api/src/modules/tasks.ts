@@ -49,11 +49,19 @@ export async function registerTasks(app: FastifyInstance) {
         participantUserIds: z.array(uuid).max(200).optional(),
         requesterId: uuid.optional(),
         clientMutationId: uuid.optional(),
+        pluginFields: z
+          .object({
+            system_id: uuid.nullable().optional(),
+            project_id: uuid.nullable().optional(),
+          })
+          .strict()
+          .optional(),
       })
       .parse(req.body);
     return reply.code(201).send(
       await transaction(req.actor.id, async (db) => {
-        const t = (await db.query('SELECT * FROM create_task($1,$2)', [bid, b])).rows[0];
+        const t = (await db.query('SELECT * FROM create_task_with_fields($1,$2)', [bid, b]))
+          .rows[0];
         return getTask(db, req.actor.id, t.id);
       }),
     );

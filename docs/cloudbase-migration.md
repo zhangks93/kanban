@@ -1,5 +1,7 @@
 # Supabase → CloudBase 国内站 PostgreSQL
 
+> 本文保留旧 API / TCP 接入与备份恢复说明。使用 Environment ID + Publishable Key 的完整看板与认证迁移，请按 [CloudBase SDK 接入指南](cloudbase-sdk.md) 操作；该模式不要求 TCP 连接串。
+
 目标环境：`final-pony-d7gnzgdj1b8ab4f99`，地域上海 `ap-shanghai`，国内站。当前仓库已准备数据库配置适配；尚未登录该环境、核查实例规格或迁移远端数据。完整 EnvId 用于管理面选择环境，不能据此拼接 PostgreSQL 主机地址。
 
 应用继续使用服务端 `pg.Pool`、现有 SQL transaction functions、飞书 OAuth 和应用 Session。CloudBase 的浏览器 Auth、PostgREST 与文档数据库不参与这条访问路径。

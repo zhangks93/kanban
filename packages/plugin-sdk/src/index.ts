@@ -84,7 +84,7 @@ export function assertPluginKeys(manifest: WorkPluginManifest, entry: { key: str
 export const coreTemplates: BoardTemplateDefinition[] = ['general', 'project'].map((key) => ({
   key: `core.${key}`,
   name: key === 'general' ? '通用工作' : '项目工作',
-  laneMode: key === 'project' ? 'manual' : 'none',
+  laneMode: 'manual',
   states: [
     { key: 'todo', name: key === 'general' ? '待处理' : '待办', group: 'unstarted' },
     { key: 'doing', name: '进行中', group: 'started' },

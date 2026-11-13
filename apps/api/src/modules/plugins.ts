@@ -165,27 +165,18 @@ export async function registerPlugins(
         ]),
       );
       const b = z.object(shape).strict().parse(req.body);
-      if (key === 'ops') {
-        if ('system_id' in b) b.service_id = null;
-        else if ('service_id' in b) b.system_id = b.service_id;
-      }
-      return manageBoard(req.actor.id, p.boardId, async (db) => {
-        const board = (await db.query('SELECT * FROM board WHERE id=$1', [p.boardId])).rows[0];
-        await db.query('SELECT require_plugin_enabled($1,$2)', [board.workspace_id, key]);
-        if (board.plugin_key !== key) throw new AppError('VALIDATION_FAILED');
-        await db.query(
-          `INSERT INTO ${key}_lane_ext(lane_id,workspace_id,board_id) VALUES($1,$2,$3) ON CONFLICT DO NOTHING`,
-          [p.laneId, board.workspace_id, p.boardId],
-        );
-        const keys = Object.keys(b);
-        if (keys.length)
-          await db.query(
-            `UPDATE ${key}_lane_ext SET ${keys.map((f, i) => `${f}=$${i + 3}`).join(',')},updated_at=now() WHERE lane_id=$1 AND board_id=$2`,
-            [p.laneId, p.boardId, ...keys.map((f) => b[f])],
-          );
-        return (await db.query(`SELECT * FROM ${key}_lane_ext WHERE lane_id=$1`, [p.laneId]))
-          .rows[0];
-      });
+      return transaction(
+        req.actor.id,
+        async (db) =>
+          (
+            await db.query('SELECT set_plugin_lane_fields($1,$2,$3,$4) AS result', [
+              p.boardId,
+              p.laneId,
+              key,
+              b,
+            ])
+          ).rows[0].result,
+      );
     });
   }
 }

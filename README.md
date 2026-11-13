@@ -2,9 +2,9 @@
 
 面向团队的工作管理平台，将多工作空间、看板协作与个人 WIP（在制任务）管理放在同一个工作台中。使用飞书账号登录，数据存储在 CloudBase 国内站 PostgreSQL，支持研发与运维场景扩展。
 
-**本地开发需要 Node.js、pnpm、飞书配置及可连接的 CloudBase PostgreSQL。** `pnpm dev` 会检查配置、应用数据库迁移，并同时启动前后端。
+**本地开发需要 Node.js、pnpm、飞书配置和 CloudBase Environment ID / Publishable Key。** 登录继续使用飞书 OAuth，用户、角色、Session 和看板数据保存在 CloudBase PostgreSQL；`pnpm dev` 同时启动前后端。
 
-[快速开始](#快速开始) · [Agent 接入](docs/agent-access.md) · [环境变量](#环境变量) · [开发与测试](#开发与测试) · [项目结构](#项目结构) · [部署说明](docs/deployment.md) · [CloudBase 迁移](docs/cloudbase-migration.md)
+[快速开始](#快速开始) · [Agent 接入](docs/agent-access.md) · [环境变量](#环境变量) · [开发与测试](#开发与测试) · [项目结构](#项目结构) · [部署说明](docs/deployment.md) · [CloudBase 迁移](docs/cloudbase-sdk.md)
 
 ![Work 看板界面](tests/e2e/00-visual.spec.ts-snapshots/board-desktop-linux.png)
 
@@ -52,7 +52,7 @@ pnpm work tasks list --limit 50
 
 - Node.js **22.13+**（推荐 24 LTS）。
 - pnpm **11.19.0**，与 `packageManager` 及锁文件保持一致。
-- 一个用于开发的 [CloudBase 国内站环境](https://tcb.cloud.tencent.com/)，已开通 **独享 PostgreSQL**，并且 API / 开发机器可以访问其数据库私网地址。共享 PostgreSQL 不提供本项目所需的 TCP 连接。
+- 一个已开通 PostgreSQL 的 [CloudBase 国内站环境](https://tcb.cloud.tencent.com/)，提供完整 Environment ID 和 Publishable Key，通过 HTTPS 访问。
 - 一个可用的 [飞书企业自建应用](https://open.feishu.cn/app)。
 
 在仓库根目录执行：
@@ -66,20 +66,23 @@ pnpm setup
 
 ### 2. 填写飞书与 CloudBase 配置
 
-编辑 `.env`，必填下面 **3 项**。首次使用再填写管理员 open_id，即可登录后创建工作空间。
+编辑根目录 `.env`。保留飞书应用凭据，补充 CloudBase 连接信息；首次使用配置管理员 open_id。
 
 ```dotenv
-DATABASE_URL=CloudBase 控制台提供的 PostgreSQL 连接串
+VITE_CLOUDBASE_ENV_ID=final-pony-d7gnzgdj1b8ab4f99
+VITE_CLOUDBASE_REGION=ap-shanghai
+VITE_CLOUDBASE_ACCESS_KEY=你的 Publishable Key
+CLOUDBASE_DB_SCHEMA=project_management
 FEISHU_APP_ID=cli_你的应用 ID
 FEISHU_APP_SECRET=你的应用密钥
 BOOTSTRAP_PLATFORM_ADMIN_FEISHU_ID=ou_管理员的 open_id
 ```
 
-**CloudBase**：确认环境属于国内站且已开通独享 PostgreSQL，从控制台数据库连接页取得实际主机、端口、数据库、用户名和密码，组成 `postgresql://` URI。密码中的 `@`、`#`、`%` 等字符需要 URL 编码。EnvId 不能直接拼成数据库地址。API 部署在数据库同地域、同 VPC 的计算环境；本地调试需要已配置的私网接入。地域、VPC、端口和安全组以目标数据库实际信息为准。
+**CloudBase**：运行 `pnpm cloudbase:sql`，在目标环境 PostgreSQL SQL 编辑器执行生成的 `.cloudbase/generated/install.sql`。它包含数据库对象与服务端签名配置，不能发布到前端或公开分享。初始化需要控制台管理权限；Publishable Key 用于 API 的 HTTPS 数据访问，不代替用户身份。
 
-按照控制台提供的 TLS 与 CA 要求配置连接，启用 TLS 时完整验证证书；需要自定义 CA 时设置 `DATABASE_CA_CERT_FILE=/安全路径/ca.pem`。生产密钥保存在运行环境的密钥管理中，不提交 `.env` 或证书私钥。
+`CLOUDBASE_DB_SCHEMA=project_management` 会自动创建该 schema，将业务表、业务函数与迁移历史放入其中。RPC 入口保留为 `public.work_platform_server`，内部辅助对象仍在 `work_platform`。执行 SQL 后运行 `pnpm cloudbase:check`，确认输出的业务 schema 为 `project_management`，再启动项目。未设置此变量时兼容原 `public` 安装；更改此变量不会搬迁已有数据。
 
-项目通过服务端 `pg` 驱动直接连接数据库，使用有建表、函数与扩展权限的数据库账号。飞书登录和应用权限仍由 API 管理，不需要浏览器数据库凭据或 CloudBase Auth 登录。启动会把仓库迁移应用到目标库，请使用独立开发数据库。旧 `SUPABASE_DB_URL` 仅作为兼容回退；设置 `DATABASE_URL` 后始终优先使用它。已有 Supabase 数据按 [迁移指南](docs/cloudbase-migration.md) 备份和迁入，不能只改地址。
+登录和认证仍走飞书，用户以 `feishu_open_id` 识别，角色及 Session 存储在 CloudBase。无需开通 CloudBase Auth。已有数据、安装步骤和服务端密钥同步要求见 [CloudBase 接入说明](docs/cloudbase-sdk.md)。没有配置 CloudBase Key 时，才兼容使用原数据库 TCP 连接串。
 
 **飞书**：在企业自建应用中启用网页登录能力，配置下列 OAuth 重定向地址，授权获取登录用户信息，并确保应用已发布且当前账号在可用范围内：
 
@@ -90,7 +93,7 @@ http://localhost:5173/auth/feishu/callback
 管理员变量使用**当前飞书应用下的 open_id**，不是 user_id 或 union_id。可以通过飞书 API 调试工具获取。若尚未取得，先登录，再通过目标数据库 SQL 编辑器查询：
 
 ```sql
-select feishu_open_id, display_name from public.app_user;
+select feishu_open_id, display_name from project_management.app_user;
 ```
 
 将自己的 open_id 填入 `.env`，重启 `pnpm dev` 并重新登录即可获得管理员身份。已引导的管理员不会因移除变量而被降权。
@@ -103,28 +106,32 @@ pnpm dev
 
 打开 **http://localhost:5173**，选择“使用飞书登录”。管理员可在“工作空间”页面创建空间与看板，开始添加任务。
 
-启动会自动检查必要配置并执行尚未应用的迁移，然后在同一终端启动 API 与 Web。数据库不通或迁移失败时会停止启动并显示错误。再次启动会跳过已执行的迁移，**不会重置数据库或导入演示用户**。按 `Ctrl+C` 停止服务；修改 `.env` 后重新启动。
+CloudBase 模式检查配置并启动 API 与 Web，不自动修改远端数据库；首次初始化由控制台执行生成的 SQL。旧 TCP 模式继续自动执行待应用迁移。两种模式都不会在启动时重置数据或导入演示用户。按 `Ctrl+C` 停止服务；修改 `.env` 后重新启动。
 
 ## 环境变量
 
 配置统一放在仓库根目录 `.env`；系统环境变量优先。可用 `ENV_FILE` 指定其他文件，相对路径按仓库根目录解析。
 
-| 变量                                 | 必填         | 用途 / 默认值                                                                  |
-| ------------------------------------ | ------------ | ------------------------------------------------------------------------------ |
-| `DATABASE_URL`                       | 是           | 服务端 CloudBase PostgreSQL TCP 连接串；API 需具备私网可达性                   |
-| `DATABASE_CA_CERT_FILE`              | 否           | 自定义数据库 CA 文件路径，启用 TLS 并完整验证证书                              |
-| `SUPABASE_DB_URL`                    | 兼容旧配置   | 仅在未设置 `DATABASE_URL` 时使用，用于迁移过渡和回滚                           |
-| `FEISHU_APP_ID`                      | 是           | 飞书企业自建应用 App ID                                                        |
-| `FEISHU_APP_SECRET`                  | 是           | 飞书企业自建应用 App Secret                                                    |
-| `BOOTSTRAP_PLATFORM_ADMIN_FEISHU_ID` | 首次使用建议 | 指定应用内管理员 open_id，登录时引导管理员身份                                 |
-| `APP_SESSION_SECRET`                 | 自动生成     | `pnpm setup` / `pnpm dev` 生成并保存；生产须显式提供至少 32 字符的独立随机密钥 |
-| `APP_BASE_URL`                       | 否           | 默认 `http://localhost:5173`，OAuth 回调与请求 Origin 的基准                   |
-| `API_PORT`                           | 否           | 默认 `3001`，Web 开发代理自动跟随                                              |
-| `TRUSTED_PROXY_CIDRS`                | 否           | 逗号分隔的受信任代理 IP/CIDR，用于解析访客 IP；默认不信任代理头                |
-| `NODE_ENV`                           | 否           | 默认 `development`，生产设为 `production`                                      |
-| `SENTRY_DSN`                         | 否           | API 错误监控                                                                   |
-| `VITE_SENTRY_DSN`                    | 否           | Web 错误监控                                                                   |
-| `FEISHU_BASE_URL`                    | 否           | 仅隔离测试中使用模拟飞书，默认留空，生产禁止设置                               |
+| 变量                                 | 必填           | 用途 / 默认值                                                                  |
+| ------------------------------------ | -------------- | ------------------------------------------------------------------------------ |
+| `VITE_CLOUDBASE_ENV_ID`              | CloudBase 模式 | 完整环境 ID，与 Publishable Key 同时填写，由 API 读取                          |
+| `VITE_CLOUDBASE_REGION`              | 否             | 默认 `ap-shanghai`                                                             |
+| `VITE_CLOUDBASE_ACCESS_KEY`          | CloudBase 模式 | Publishable Key；服务端另校验签名与飞书 Session                                |
+| `CLOUDBASE_DB_SCHEMA`               | 否             | CloudBase 业务 schema，示例为 `project_management`；未配置时兼容 `public`        |
+| `DATABASE_URL`                       | 旧 TCP 模式    | 服务端 CloudBase PostgreSQL TCP 连接串；API 需具备私网可达性                   |
+| `DATABASE_CA_CERT_FILE`              | 否             | 自定义数据库 CA 文件路径，启用 TLS 并完整验证证书                              |
+| `SUPABASE_DB_URL`                    | 兼容旧配置     | 仅在未设置 `DATABASE_URL` 时使用，用于迁移过渡和回滚                           |
+| `FEISHU_APP_ID`                      | 是             | 飞书企业自建应用 App ID                                                        |
+| `FEISHU_APP_SECRET`                  | 是             | 飞书企业自建应用 App Secret                                                    |
+| `BOOTSTRAP_PLATFORM_ADMIN_FEISHU_ID` | 首次使用建议   | 指定应用内管理员 open_id，登录时引导管理员身份                                 |
+| `APP_SESSION_SECRET`                 | 自动生成       | `pnpm setup` / `pnpm dev` 生成并保存；生产须显式提供至少 32 字符的独立随机密钥 |
+| `APP_BASE_URL`                       | 否             | 默认 `http://localhost:5173`，OAuth 回调与请求 Origin 的基准                   |
+| `API_PORT`                           | 否             | 默认 `3001`，Web 开发代理自动跟随                                              |
+| `TRUSTED_PROXY_CIDRS`                | 否             | 逗号分隔的受信任代理 IP/CIDR，用于解析访客 IP；默认不信任代理头                |
+| `NODE_ENV`                           | 否             | 默认 `development`，生产设为 `production`                                      |
+| `SENTRY_DSN`                         | 否             | API 错误监控                                                                   |
+| `VITE_SENTRY_DSN`                    | 否             | Web 错误监控                                                                   |
+| `FEISHU_BASE_URL`                    | 否             | 仅隔离测试中使用模拟飞书，默认留空，生产禁止设置                               |
 
 `.env` 已被 Git 忽略。数据库密码、飞书密钥与 Session 密钥只在服务端使用，不要为其添加 `VITE_` 前缀。
 
@@ -132,24 +139,27 @@ pnpm dev
 
 ### 常用命令
 
-| 命令                            | 作用                                     |
-| ------------------------------- | ---------------------------------------- |
-| `pnpm setup`                    | 初始化本地配置与 Session 密钥            |
-| `pnpm dev`                      | 配置检查 → 数据库迁移 → 启动前后端       |
-| `pnpm dev:api` / `pnpm dev:web` | 单独启动 API / Web；自行先执行迁移       |
-| `pnpm db:check`                 | 只读检查数据库版本、扩展、权限与迁移历史 |
-| `pnpm db:migrate`               | 仅执行待应用的迁移                       |
-| `pnpm lint` / `pnpm typecheck`  | 代码规范与 TypeScript 检查               |
-| `pnpm test:unit`                | 不依赖数据库的配置、任务队列与 CLI 测试  |
-| `pnpm test` / `pnpm test:db`    | API 集成测试 / pgTAP 数据库约束测试      |
-| `pnpm test:e2e`                 | Playwright 浏览器测试                    |
-| `pnpm build`                    | 构建 Web、API 与 CLI                     |
-| `pnpm work` / `pnpm build:cli`  | 运行 CLI 源码 / 构建独立 CLI             |
-| `pnpm check:secrets`            | 检查 Web 构建产物是否包含服务端密钥引用  |
+| 命令                            | 作用                                       |
+| ------------------------------- | ------------------------------------------ |
+| `pnpm setup`                    | 初始化本地配置与 Session 密钥              |
+| `pnpm dev`                      | 配置检查 → 启动前后端（旧 TCP 模式先迁移） |
+| `pnpm cloudbase:sql`            | 生成 CloudBase 初始化 SQL 与服务端签名配置 |
+| `pnpm cloudbase:check`          | 检查 CloudBase 连接与服务端签名            |
+| `pnpm test:cloudbase`           | 隔离验证飞书 OAuth、Session 和云端数据访问 |
+| `pnpm dev:api` / `pnpm dev:web` | 单独启动 API / Web；自行先执行迁移         |
+| `pnpm db:check`                 | 只读检查数据库版本、扩展、权限与迁移历史   |
+| `pnpm db:migrate`               | 仅执行待应用的迁移                         |
+| `pnpm lint` / `pnpm typecheck`  | 代码规范与 TypeScript 检查                 |
+| `pnpm test:unit`                | 不依赖数据库的配置、任务队列与 CLI 测试    |
+| `pnpm test` / `pnpm test:db`    | API 集成测试 / pgTAP 数据库约束测试        |
+| `pnpm test:e2e`                 | Playwright 浏览器测试                      |
+| `pnpm build`                    | 构建 Web、API 与 CLI                       |
+| `pnpm work` / `pnpm build:cli`  | 运行 CLI 源码 / 构建独立 CLI               |
+| `pnpm check:secrets`            | 检查 Web 构建产物是否包含服务端密钥引用    |
 
 ### 隔离集成测试
 
-日常开发使用飞书与 CloudBase 独享 PostgreSQL。完整集成测试使用 Fake Feishu、演示账号与**可丢弃的本机 PostgreSQL 15+ 数据库**，数据库还需安装 `pgTAP`。这套测试环境与日常调试分开配置：
+日常开发使用飞书与 CloudBase HTTPS RPC。完整集成测试使用 Fake Feishu、演示账号与**可丢弃的本机 PostgreSQL 15+ 数据库**，数据库还需安装 `pgTAP`。这套测试环境与日常调试分开配置：
 
 ```bash
 cp tests/.env.example .env.test
@@ -163,7 +173,7 @@ ENV_FILE=.env.test pnpm test:e2e
 
 Windows PowerShell 使用 `$env:ENV_FILE=".env.test"`，再运行对应命令。Playwright 会自动启动 API、Web 与 Fake Feishu。GitHub Actions 使用原生 PostgreSQL 与 pgTAP，无需 Docker 配置。
 
-`db:reset` 会删除并重建 `public` schema，E2E setup 也会执行 reset。`db:reset` 与 `db:seed` 仅允许回环地址，不能指向需要保留数据的数据库。CloudBase 等远端数据库调试使用 `pnpm dev` 或 `pnpm db:migrate`。
+`db:reset` 会删除并重建 `public` schema，E2E setup 也会执行 reset。`db:reset` 与 `db:seed` 仅允许回环地址，不能指向需要保留数据的数据库。CloudBase 等远端数据库调试使用 初始化 SQL 和 `pnpm dev`；`db:*` 命令用于旧 TCP 模式。
 
 截图基线使用 Linux Chromium；更换系统、字体或浏览器版本后需人工复核差异，再决定是否执行 `pnpm test:e2e --update-snapshots`。已有 Chromium 的环境可通过 `CHROMIUM_PATH` 指定可执行文件。
 
@@ -191,8 +201,8 @@ skills/work-platform/ Agent 接入 skill 与操作规范
 
 ## 常见问题
 
-- **启动提示缺少变量**：运行 `pnpm setup`，填写根目录 `.env` 的 3 项必填配置；不要把服务端配置放在 `apps/web/.env`。
-- **CloudBase 连接失败**：先确认实例是独享 PostgreSQL。核对控制台实际连接地址、数据库与账号、TLS 证书，以及 API 到数据库私网的 VPC / VPN 路由和安全组；共享实例不能通过调整地址或安全组获得 TCP 连接。
+- **启动提示缺少变量**：运行 `pnpm setup`，填写根目录 `.env` 的 CloudBase 与飞书配置；不要把服务端配置放在 `apps/web/.env`。
+- **CloudBase 连接失败**：运行 `pnpm cloudbase:check`，核对 Environment ID、Publishable Key、初始化 SQL，以及 API 与数据库签名配置是否来自同一 APP_SESSION_SECRET。
 - **迁移找不到数据库扩展函数**：连接统一使用 `search_path=public,extensions`，兼容历史数据库安装在 `extensions` schema 的扩展；确认数据库账号拥有建表与创建扩展权限。
 - **飞书回调失败**：核对应用发布状态、用户范围、登录用户信息权限，以及回调白名单是否与启动输出完全一致。`localhost` 与 `127.0.0.1` 不能混用。
 - **登录后看不到工作空间**：新数据库没有演示数据。配置管理员 open_id 后重新登录，由管理员创建空间或邀请成员。

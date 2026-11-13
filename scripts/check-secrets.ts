@@ -6,7 +6,7 @@ async function scan(dir: string): Promise<void> {
     else if (/\.(js|html|css|map)$/.test(path)) {
       const text = await readFile(path, 'utf8');
       if (
-        /DATABASE_URL|DATABASE_CA_CERT_FILE|SUPABASE_DB_URL|FEISHU_APP_SECRET|APP_SESSION_SECRET|postgres(?:ql)?:\/\//.test(
+        /DATABASE_URL|DATABASE_CA_CERT_FILE|SUPABASE_DB_URL|FEISHU_APP_SECRET|APP_SESSION_SECRET|work_platform_server|work-platform\/cloudbase\/server\/v1|postgres(?:ql)?:\/\//.test(
           text,
         )
       )

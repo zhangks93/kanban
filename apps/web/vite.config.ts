@@ -5,7 +5,7 @@ import '../api/src/lib/env';
 const appUrl = new URL(process.env.APP_BASE_URL!);
 const apiTarget = `http://127.0.0.1:${process.env.API_PORT}`;
 export default defineConfig({
-  envDir: '../..',
+  envDir: process.env.ENV_FILE ? false : '../..',
   plugins: [react(), tailwind()],
   server: {
     port: Number(appUrl.port || (appUrl.protocol === 'https:' ? 443 : 80)),

@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./agent-manifest": "./src/agent-manifest.ts",
     "./manifest": "./src/manifest.ts",
     "./server": "./src/server.ts",
     "./web": "./src/web.tsx"

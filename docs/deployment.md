@@ -1,5 +1,7 @@
 # 部署
 
+默认使用飞书 OAuth / Session 与 CloudBase HTTPS RPC。用户、角色和业务数据保存在 CloudBase，按 [CloudBase 接入指南](cloudbase-sdk.md) 初始化；部署仍需 API 与 Web，沿用下面的同源反向代理。以下 TCP 数据库要求仅适用于兼容模式。
+
 本地调试按 [README 快速开始](../README.md#快速开始) 执行 `pnpm setup` → 填写飞书与 CloudBase 配置 → `pnpm dev`。本文件说明生产部署要求。
 
 ## 服务边界
@@ -8,7 +10,7 @@ Web 只请求同源 `/api` 和 `/auth`。API 使用服务端数据库账号，�
 
 构建：`pnpm install --frozen-lockfile && pnpm build`。Web 产物在 `apps/web/dist/`；API 产物是 `apps/api/dist/index.mjs`。API package 的 `start` 脚本也可启动 bundle。
 
-API 需要 `APP_BASE_URL`、至少 32 个随机字符的 `APP_SESSION_SECRET`、`DATABASE_URL`、`FEISHU_APP_ID`、`FEISHU_APP_SECRET`，以及首次引导需要的 `BOOTSTRAP_PLATFORM_ADMIN_FEISHU_ID`。`API_PORT` 默认 3001；`SENTRY_DSN` 可选。Web 只接受 `VITE_SENTRY_DSN`，其余环境配置不得添加 `VITE_` 前缀。
+API 需要 `APP_BASE_URL`、至少 32 个随机字符的 `APP_SESSION_SECRET`、`DATABASE_URL`、`FEISHU_APP_ID`、`FEISHU_APP_SECRET`，以及首次引导需要的 `BOOTSTRAP_PLATFORM_ADMIN_FEISHU_ID`。`API_PORT` 默认 3001；`SENTRY_DSN` 可选。CloudBase HTTPS 模式改用环境 ID 与 Publishable Key；`VITE_CLOUDBASE_*` 由 API 读取，也支持不带 VITE_ 的服务端名称。飞书和 Session 密钥始终留在服务端。
 
 使用飞书应用的稳定 **open_id** 建立用户唯一索引。管理员引导变量也使用 open_id；已存在的目标用户会在下一次登录时被引导为管理员。普通登录或移除引导变量不会降权已有管理员。
 

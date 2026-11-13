@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { config } from 'dotenv';
 import { getDatabasePoolConfig } from './database-config';
+import { getCloudBaseConfig } from './cloudbase-config';
 
 export function loadEnvironment() {
   let root = process.cwd();
@@ -18,7 +19,7 @@ export function loadEnvironment() {
 export function validateEnvironment(env: NodeJS.ProcessEnv = process.env) {
   const errors: string[] = [];
   try {
-    getDatabasePoolConfig(env);
+    if (!getCloudBaseConfig(env)) getDatabasePoolConfig(env);
   } catch (error) {
     errors.push(error instanceof Error ? error.message : '数据库配置无效');
   }

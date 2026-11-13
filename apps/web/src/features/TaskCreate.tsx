@@ -26,6 +26,7 @@ export function TaskCreate({
   initialLane,
   initialResponsible,
   initialParent,
+  initialPluginFields,
 }: {
   data: BoardData;
   open: boolean;
@@ -34,6 +35,7 @@ export function TaskCreate({
   initialLane?: string | null;
   initialResponsible?: string;
   initialParent?: string;
+  initialPluginFields?: Record<string, string | null>;
 }) {
   const { me, notify } = useApp();
   const qc = useQueryClient();
@@ -77,6 +79,7 @@ export function TaskCreate({
               laneId: b.laneId || null,
               clientMutationId: crypto.randomUUID(),
               parentId: initialParent,
+              ...(initialPluginFields ? { pluginFields: initialPluginFields } : {}),
             });
             await qc.invalidateQueries({ queryKey: ['tasks'] });
             reset();
@@ -160,7 +163,7 @@ export function TaskCreate({
           <small className="muted">1 天 = 8 小时</small>
           {errors.estimateDays && <span className="error">{errors.estimateDays.message}</span>}
         </label>
-        {data.board.lane_mode === 'manual' && (
+        {!data.board.plugin_key && data.board.lane_mode === 'manual' && (
           <label>
             泳道
             <select {...register('laneId')}>

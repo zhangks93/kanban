@@ -414,23 +414,25 @@ function TaskBody({
         <details className="secondary-properties">
           <summary>更多属性</summary>
           <div className="property-grid">
-            <label>
-              泳道
-              <select
-                disabled={!t.can_edit || data.board.lane_mode === 'none'}
-                value={t.lane_id ?? ''}
-                onChange={(e) => void save({ laneId: e.target.value || null }, '/move', 'POST')}
-              >
-                <option value="">未分组</option>
-                {data.lanes
-                  .filter((l) => l.status === 'active')
-                  .map((l) => (
-                    <option value={l.id} key={l.id}>
-                      {l.name}
-                    </option>
-                  ))}
-              </select>
-            </label>
+            {!data.board.plugin_key && (
+              <label>
+                泳道
+                <select
+                  disabled={!t.can_edit || data.board.lane_mode === 'none'}
+                  value={t.lane_id ?? ''}
+                  onChange={(e) => void save({ laneId: e.target.value || null }, '/move', 'POST')}
+                >
+                  <option value="">未分组</option>
+                  {data.lanes
+                    .filter((l) => l.status === 'active')
+                    .map((l) => (
+                      <option value={l.id} key={l.id}>
+                        {l.name}
+                      </option>
+                    ))}
+                </select>
+              </label>
+            )}
             <label>
               类型
               <select

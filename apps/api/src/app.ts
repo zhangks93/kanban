@@ -20,6 +20,10 @@ import { pool } from './lib/db';
 import { AppError, databaseCode } from './lib/errors';
 import { errorStatus, messages } from '@work/shared';
 import { ZodError } from 'zod';
+import { getCloudBaseConfig } from './lib/cloudbase-config';
+import { cloudbaseRpc, CloudBaseError } from './lib/cloudbase';
+import { registerCloudbase } from './modules/cloudbase';
+import { recordCloudbaseFailure } from './lib/cloudbase-diagnostics';
 export async function buildApp(plugins = installedPlugins) {
   const registry = buildRegistry(plugins);
   const app = Fastify({
@@ -41,7 +45,29 @@ export async function buildApp(plugins = installedPlugins) {
     reply.header('x-request-id', req.id);
     return payload;
   });
-  app.setErrorHandler((e, req, reply) => {
+  app.setErrorHandler(async (e, req, reply) => {
+    if (e instanceof CloudBaseError) {
+      if (e.code.startsWith('CLOUDBASE_')) {
+        req.log.error({ code: e.code, upstream: e.upstream }, 'CloudBase request failed');
+        await recordCloudbaseFailure(req.id, e).catch(() => {
+          req.log.error('Could not save CloudBase diagnostics');
+        });
+      }
+      const status =
+        e.code === 'RATE_LIMITED' ? 429 : (errorStatus[e.code as keyof typeof errorStatus] ?? 503);
+      return reply.status(status).send({
+        error: {
+          code: e.code,
+          message:
+            messages[e.code as keyof typeof messages] ??
+            (e.code === 'RATE_LIMITED'
+              ? '提交较频繁，请稍后再试'
+              : 'CloudBase 数据服务暂时不可用，请检查服务端配置与初始化 SQL'),
+          detail: e.detail ?? e.upstream,
+          requestId: req.id,
+        },
+      });
+    }
     const code =
       e instanceof AppError
         ? e.code
@@ -64,11 +90,16 @@ export async function buildApp(plugins = installedPlugins) {
       .send({ error: { code: 'INTERNAL_ERROR', message: '服务暂时不可用', requestId: req.id } });
   });
   app.get('/api/health', async () => {
-    await pool.query('SELECT 1');
+    if (getCloudBaseConfig()) await cloudbaseRpc({ method: 'GET', path: '/api/health' });
+    else await pool.query('SELECT 1');
     return { status: 'ok' };
   });
   await registerAuthMiddleware(app);
   await registerAuth(app);
+  if (getCloudBaseConfig()) {
+    await registerCloudbase(app);
+    return app;
+  }
   await registerAgentAuth(app);
   await registerAgentData(app);
   await registerWorkspaces(app);

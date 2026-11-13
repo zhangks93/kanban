@@ -12,7 +12,7 @@ import { Modal } from '../components/ui';
 export function MyWork() {
   const { me, notify } = useApp();
   const tasks = useQuery({
-    queryKey: ['tasks', 'my'],
+    queryKey: ['tasks', 'my', me.id],
     queryFn: () => api<Task[]>('/api/me/tasks'),
   });
   const [tab, setTab] = useState('focus');
@@ -29,12 +29,10 @@ export function MyWork() {
     tab === 'focus'
       ? t.focus_user_ids.includes(me.id)
       : tab === 'responsible'
-        ? t.relation === 'responsible' &&
-          !t.focus_user_ids.includes(me.id) &&
-          !['completed', 'cancelled'].includes(t.state_group)
+        ? t.responsible_id === me.id && !['completed', 'cancelled'].includes(t.state_group)
         : tab === 'participant'
-          ? t.relation === 'participant' &&
-            !t.focus_user_ids.includes(me.id) &&
+          ? t.responsible_id !== me.id &&
+            t.participants.some((p) => p.id === me.id) &&
             !['completed', 'cancelled'].includes(t.state_group)
           : tab === 'due'
             ? t.due_date &&
@@ -130,7 +128,7 @@ export function MyWork() {
                         {t.title}
                       </button>
                       <span className="relation-tag">
-                        {t.relation === 'responsible' ? '负责' : '参与'}
+                        {t.responsible_id === me.id ? '负责' : '参与'}
                       </span>
                       <span className="muted row-board">{t.board_name}</span>
                       <time className="mono muted">{t.due_date?.slice(5, 10) ?? '—'}</time>

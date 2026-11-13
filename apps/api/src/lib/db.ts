@@ -2,7 +2,16 @@ import './env';
 import { requestContext } from './request-context';
 import pg from 'pg';
 import { getDatabasePoolConfig } from './database-config';
-export const pool = new pg.Pool(getDatabasePoolConfig());
+// CloudBase HTTP mode imports the legacy modules but never opens a TCP pool.
+let instance: pg.Pool | undefined;
+export const pool = new Proxy({} as pg.Pool, {
+  get(_target, property) {
+    if (property === 'end' && !instance) return async () => {};
+    instance ??= new pg.Pool(getDatabasePoolConfig());
+    const value = Reflect.get(instance, property);
+    return typeof value === 'function' ? value.bind(instance) : value;
+  },
+});
 export async function transaction<T>(
   actor: string | null,
   fn: (db: pg.PoolClient) => Promise<T>,

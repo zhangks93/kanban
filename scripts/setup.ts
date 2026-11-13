@@ -8,4 +8,7 @@ console.log(
     ? '已创建本地环境文件并生成 Session 密钥。'
     : '已保留现有配置，补齐未设置的本地 Session 密钥。',
 );
-console.log(`请编辑 ${result.path} 中的 CloudBase PostgreSQL 与飞书配置，然后运行 pnpm dev。`);
+console.log(
+  `请在 ${result.path} 中填写 CloudBase Environment ID、Publishable Key 与飞书配置，然后运行 pnpm dev。`,
+);
+console.log('首次使用运行 pnpm cloudbase:sql，在 CloudBase SQL 编辑器中执行生成的初始化文件。');

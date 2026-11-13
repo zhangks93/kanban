@@ -87,7 +87,7 @@ test('unified foundation data and the plugin dependency guard are visible', asyn
     .click();
   await expect(page.getByRole('row').filter({ hasText: 'Core' })).toHaveCount(0);
   await page.goto('/workspaces/beta/boards');
-  await expect(page.getByRole('link', { name: '基础数据', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: '基础数据', exact: true })).toHaveCount(0);
   await expect(page.getByRole('link', { name: '研发系统', exact: true })).toHaveCount(0);
   await expect(page.getByRole('link', { name: '运维服务', exact: true })).toHaveCount(0);
 });

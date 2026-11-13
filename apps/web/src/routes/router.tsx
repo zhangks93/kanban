@@ -5,6 +5,7 @@ import { PublicBoard } from '../features/PublicBoard';
 import { AuditPage } from '../features/AuditPage';
 import { AgentAccess } from '../features/AgentAccess';
 import { installedPlugins } from '../plugins/registry';
+import { useWorkspacePlugins } from '../plugins/useWorkspacePlugins';
 import { PluginSettings } from '../features/PluginSettings';
 import { MyWork } from '../features/MyWork';
 import { WorkReportPage } from '../features/WorkReportPage';
@@ -66,7 +67,9 @@ function Shell() {
     enabled: !!me.data && !isPublic,
   });
   const key = location.pathname.match(/^\/workspaces\/([^/]+)/)?.[1];
+  const isPersonalWorkbench = !key;
   const workspace = workspaces.data?.find((w) => w.key === key);
+  const plugins = useWorkspacePlugins(workspace?.id);
   const boards = useQuery({
     queryKey: ['boards', workspace?.id],
     queryFn: () => api<Board[]>(`/api/workspaces/${workspace!.id}/boards`),
@@ -156,21 +159,34 @@ function Shell() {
             </nav>
           </CompactPopover>
           <nav>
-            <a className={location.pathname === '/my' ? 'selected' : ''} href="/my">
-              <Inbox size={16} />
-              我的工作<span className="nav-count">{me.data.used_wip}</span>
-            </a>
-            <a className={location.pathname === '/work-logs' ? 'selected' : ''} href="/work-logs">
-              <Layers size={16} />
-              工时统计
-            </a>
-            <a
-              className={location.pathname === '/agent-access' ? 'selected' : ''}
-              href="/agent-access"
-            >
-              <Bot size={16} />
-              Agent 访问
-            </a>
+            {isPersonalWorkbench && (
+              <>
+                <a className={location.pathname === '/my' ? 'selected' : ''} href="/my">
+                  <Inbox size={16} />
+                  我的工作<span className="nav-count">{me.data.used_wip}</span>
+                </a>
+                <a
+                  className={location.pathname === '/work-logs' ? 'selected' : ''}
+                  href="/work-logs"
+                >
+                  <Layers size={16} />
+                  工时统计
+                </a>
+                <a
+                  className={location.pathname === '/agent-access' ? 'selected' : ''}
+                  href="/agent-access"
+                >
+                  <Bot size={16} />
+                  Agent 访问
+                </a>
+                {me.data.is_platform_admin && (
+                  <a href="/admin/users">
+                    <Users size={16} />
+                    平台用户
+                  </a>
+                )}
+              </>
+            )}
             {workspace && (
               <>
                 <a href={`/workspaces/${workspace.key}/search`}>
@@ -194,13 +210,15 @@ function Shell() {
                   </a>
                 ))}
                 <div className="nav-section">工作空间</div>
-                <a
-                  className={location.pathname.endsWith('/data') ? 'selected' : ''}
-                  href={`/workspaces/${workspace.key}/data`}
-                >
-                  <Database size={16} />
-                  基础数据
-                </a>
+                {plugins.systems && (
+                  <a
+                    className={location.pathname.endsWith('/data') ? 'selected' : ''}
+                    href={`/workspaces/${workspace.key}/data`}
+                  >
+                    <Database size={16} />
+                    基础数据
+                  </a>
+                )}
                 <a href={`/workspaces/${workspace.key}/settings/members`}>
                   <Users size={16} />
                   成员
@@ -215,12 +233,6 @@ function Shell() {
                   <a href={`/workspaces/${workspace.key}/settings/audit`}>审计记录</a>
                 )}
               </>
-            )}
-            {me.data.is_platform_admin && (
-              <a href="/admin/users">
-                <Users size={16} />
-                平台用户
-              </a>
             )}
           </nav>
           <div className="nav-profile">
