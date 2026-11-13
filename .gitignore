@@ -10,3 +10,5 @@ test-results/
 work-platform-source.zip
 work/
 .cloudbase/generated/
+**/skills/impeccable/scripts/bin/
+.impeccable/
